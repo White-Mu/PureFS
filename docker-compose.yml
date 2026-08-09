@@ -1,0 +1,20 @@
+version: "3.8"
+
+services:
+  purefs:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: purefs
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+    environment:
+      PUREFS_CONFIG: /app/data/config.yaml
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
