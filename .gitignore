@@ -29,3 +29,4 @@ data/
 
 # Deploy artifacts
 *.tar.gz
+purefsd.exe~
