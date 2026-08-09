@@ -34,7 +34,7 @@ func (r *AuditLogRepo) List(limit, offset int) ([]*model.AuditLog, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var logs []*model.AuditLog
+	logs := []*model.AuditLog{}
 	for rows.Next() {
 		l := &model.AuditLog{}
 		if err := rows.Scan(&l.ID, &l.UserID, &l.Action, &l.Detail, &l.IP, &l.CreatedAt); err != nil {

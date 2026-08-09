@@ -29,7 +29,7 @@ func (r *PermissionRepo) GetByUser(userID int64) ([]*model.Permission, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var perms []*model.Permission
+	perms := []*model.Permission{}
 	for rows.Next() {
 		p := &model.Permission{}
 		if err := rows.Scan(&p.ID, &p.UserID, &p.FilePath, &p.Perm); err != nil {

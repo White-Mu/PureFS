@@ -14,8 +14,8 @@ export default function AdminPage() {
   useEffect(() => {
     if (user?.role !== 'admin') return;
     // Always load both on mount
-    admin.auditLogs({ limit: 100 }).then(setLogs).catch(function() {});
-    admin.listUsers().then(setUsers).catch(function() {});
+    admin.auditLogs({ limit: 100 }).then((logs) => setLogs(logs || [])).catch(function() {});
+    admin.listUsers().then((users) => setUsers(users || [])).catch(function() {});
     setLoading(false);
   }, [user]);
 

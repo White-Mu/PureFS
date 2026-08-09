@@ -63,7 +63,7 @@ func (r *UserRepo) List() ([]*model.User, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var users []*model.User
+	users := []*model.User{}
 	for rows.Next() {
 		u := &model.User{}
 		if err := rows.Scan(&u.ID, &u.Username, &u.Email, &u.Role, &u.StorageQuota, &u.StorageUsed, &u.IsActive, &u.CreatedAt, &u.UpdatedAt); err != nil {
@@ -82,8 +82,8 @@ func (r *UserRepo) UpdateStorageUsed(userID int64, delta int64) error {
 func (r *UserRepo) Update(u *model.User) error {
 	u.UpdatedAt = time.Now()
 	_, err := r.db.Exec(
-		`UPDATE users SET email=?, role=?, totp_secret=?, totp_enabled=?, storage_quota=?, is_active=?, updated_at=? WHERE id=?`,
-		u.Email, u.Role, u.TOTPSecret, u.TOTPEnabled, u.StorageQuota, u.IsActive, u.UpdatedAt, u.ID,
+		`UPDATE users SET email=?, password_hash=?, role=?, totp_secret=?, totp_enabled=?, storage_quota=?, is_active=?, updated_at=? WHERE id=?`,
+		u.Email, u.PasswordHash, u.Role, u.TOTPSecret, u.TOTPEnabled, u.StorageQuota, u.IsActive, u.UpdatedAt, u.ID,
 	)
 	return err
 }
