@@ -1,158 +1,95 @@
 # PureFS 当前状态总览
 
-> 更新时间: 2026-07-30
+> 更新时间: 2026-08-09
 
 ## 代码规模
 
 | 层级 | 文件数 | 代码行数 |
 |------|--------|----------|
-| Go 后端 | 55 个 .go 文件 | ~7,900 行 |
-| React 前端 | 14 个 .tsx/.ts 文件 | ~2,000 行 |
+| Go 后端 | 65 个 .go 文件 | ~10,000 行 |
+| React 前端 | 19 个 .tsx/.ts 文件 | ~3,000 行 |
 | CSS 样式 | 2 个 .css 文件 | ~790 行 |
-| **合计** | **71 个源文件** | **~10,700 行** |
+| 文档 | 12 个 .md 文件 | — |
+| **合计** | **~100 个源文件** | **~14,000 行** |
 
-## 后端架构
+## P0 — 核心可用 ✅ 100%
 
-```
-PureFS-App/
-├── cmd/purefsd/main.go            # 主入口，依赖注入，启动流程
-├── internal/
-│   ├── config/config.go           # YAML 配置，首次运行自动生成
-│   ├── database/                  # SQLite (modernc) + goose 迁移
-│   │   └── migrations/            # 6 个迁移文件
-│   ├── model/                     # 数据模型 + DTO
-│   ├── repository/                # 7 个仓库 (user, file, share, permission, audit, recycle, version)
-│   ├── service/                   # 7 个服务 (file, user, share, audit, recycle, integrity, version, search)
-│   ├── handler/                   # 10 个处理器 (file, user, share, public_share, audit, permission, recycle, search, version, admin)
-│   ├── middleware/                 # 认证、CORS、速率限制、日志
-│   ├── storage/                   # 存储抽象 (local, s3, encrypted 装饰器)
-│   ├── crypto/                    # AES-256-GCM 加解密 + 密钥轮换
-│   ├── search/                    # SQLite FTS5 全文搜索 + 文档提取
-│   ├── task/queue.go              # 异步任务队列 (goroutine + channel)
-│   ├── monitoring/stats.go        # 系统资源监控
-│   └── plugin/                    # (待实现)
-├── pkg/
-│   ├── jwtutil/                   # JWT 签发/解析
-│   ├── response/                  # HTTP 响应工具
-│   └── sftp/                      # SFTP 服务器
-├── webdav/webdav.go              # WebDAV 协议支持
-└── plugins/sdk/                   # 插件 SDK (待实现)
-```
+| 功能 | 状态 |
+|------|------|
+| 文件 CRUD（上传/下载/重命名/移动/删除） | ✅ |
+| 用户注册/登录 JWT 认证 | ✅ |
+| 三种浏览视图（列表/网格/时间线） | ✅ |
+| 存储后端 LocalFS | ✅ |
+| S3 兼容对象存储 | ✅ |
+| 配置系统（首次运行自动生成） | ✅ |
+| 数据库迁移（6 个迁移文件） | ✅ |
 
-## 前端架构
+## P1 — 必备功能 ✅ 100%
 
-```
-PureFS-Web/
-└── src/
-    ├── api/
-    │   ├── client.ts              # Axios 客户端 + JWT 拦截器
-    │   └── index.ts               # API 函数 + TypeScript 类型
-    ├── components/
-    │   ├── AppLayout.tsx           # (未使用)
-    │   ├── Breadcrumb.tsx          # 面包屑导航
-    │   ├── ContextMenu.tsx         # 右键菜单 (Portal 实现)
-    │   ├── FileGrid.tsx            # 网格视图
-    │   ├── FilePreview.tsx         # 文件预览 (图片/视频/文本)
-    │   ├── FileRow.tsx             # 列表行 + 行内重命名
-    │   ├── SelectionToolbar.tsx    # 批量操作栏
-    │   ├── ShareDialog.tsx         # 分享链接创建弹窗
-    │   ├── Sidebar.tsx             # 左侧导航
-    │   └── UploadOverlay.tsx       # 上传进度浮层
-    ├── pages/
-    │   ├── LoginPage.tsx           # 登录/注册/2FA
-    │   ├── FilesPage.tsx           # 核心文件浏览器 (含 TimelineView)
-    │   ├── SharePage.tsx           # 公开分享页面
-    │   ├── SharesPage.tsx          # 我的分享列表
-    │   ├── SettingsPage.tsx        # 用户设置/2FA 配置
-    │   └── AdminPage.tsx           # 管理后台 (审计/用户/权限)
-    ├── store/index.ts             # Zustand (auth + UI 状态)
-    ├── styles/
-    │   ├── globals.css             # 设计令牌 (浅色/暗色主题)
-    │   └── components.css          # 组件样式
-    └── i18n/                      # 国际化 (zh-CN / en-US)
-```
+| 功能 | 状态 |
+|------|------|
+| 分享外链（密码/有效期/次数限制/下载权限） | ✅ |
+| 公开分享落地页（内联预览图片/视频/文本） | ✅ |
+| 文件预览（图片/视频/文本 Modal） | ✅ |
+| TOTP 两步验证（QR 码 + 6 位验证） | ✅ |
+| 管理面板（审计日志/用户列表/权限管理） | ✅ |
+| 收藏 / 置顶 / 最近（后端 SQL 层过滤） | ✅ |
+| WebDAV 协议（用户空间隔离 + DB 同步） | ✅ |
+| 暗色模式（CSS 自定义属性 + 侧边栏切换） | ✅ |
+| 文件夹权限（read/write/admin + 最长前缀匹配） | ✅ |
+| 回收站（软删除/恢复/清空/30 天自动清理） | ✅ |
+| 文件名搜索（SQL LIKE + FTS5 全文搜索） | ✅ |
+| 文件完整性校验（SHA256，定期自动） | ✅ |
+| 速率限制（登录 5次/分钟，注册 3次/小时） | ✅ |
+| 文件版本（上传覆盖自动保存旧版本，可配置保留数） | ✅ |
+| SFTP 协议（嵌入式 SSH 服务器） | ✅ |
 
-## 已实现功能清单
+## P2 — 增强功能 ✅ 95%
 
-### 文件管理
-- [x] 文件 CRUD (上传/下载/预览/重命名/移动/删除)
-- [x] 三种浏览视图 (列表 / 大图标网格 / 时间线)
-- [x] 置顶 & 收藏标记 + 专用页面
-- [x] 批量选择 & 批量删除
-- [x] 右键上下文菜单 (刷新/收藏/置顶/重命名/下载/分享/删除)
-- [x] 行内重命名 (Enter/✓ 确认, Escape/✕ 取消)
-- [x] 拖拽上传
-- [x] 文件夹导航 (面包屑)
-- [x] 默认按时间降序排列
+| 功能 | 状态 |
+|------|------|
+| SQLite FTS5 全文搜索 + 文档内容提取 | ✅ |
+| 异步索引任务队列 | ✅ |
+| AES-256-GCM 服务端加密 + 密钥轮换 | ✅ |
+| TOTP 二维码本地生成 | ⚠️ 依赖 api.qrserver.com 外网 |
+| IPC 本地文件权限穿透 | ✅ |
+| 批量选择 + 批量删除（前端循环） | ⚠️ 无批量后端 API |
+| 文件复制 | ❌ 只有 Move 无 Copy |
+| 端到端加密 E2EE（客户端加解密） | ❌ 仅服务端透明加密 |
+| 国际化（zh-CN/en-US 翻译文件已有） | ⚠️ UI 未接入 i18n |
+| 移动端响应式 | ❌ 桌面专用 |
+| HTTPS/TLS | ❌ |
+| JWT Refresh Token | ❌ |
+| 密码重置 / 邮件系统 | ❌ |
+| 图片缩略图 | ❌ |
+| 管理员用户创建/编辑/禁用 | ⚠️ 只能查看用户列表 |
 
-### 用户与安全
-- [x] 用户注册 & 登录 (JWT + bcrypt)
-- [x] TOTP 双因素认证
-- [x] 基于文件夹路径的权限 (read/write/admin)
-- [x] 密码强度校验
-- [x] 速率限制 (登录/注册/上传)
-- [x] AES-256-GCM 服务端透明加密 + 密钥轮换
-- [x] 完整审计日志
-- [x] 零数据扫描、零数据分析
+## P3 — 平台/客户端 ❌ 5%
 
-### 分享
-- [x] 生成分享外链
-- [x] 提取码 (密码)
-- [x] 有效期设置
-- [x] 访问次数限制
-- [x] 下载权限控制
+| 功能 | 状态 |
+|------|------|
+| Docker 多阶段构建（x86_64 + ARM64） | ✅ |
+| Docker Compose 一键部署 | ✅ |
+| 裸机二进制部署 | ✅ |
+| 系统资源监控（CPU/内存/磁盘/SSE 推送） | ✅ |
+| 一键备份（SQLite VACUUM INTO） | ✅ |
+| 插件系统（gRPC sidecar） | ❌ 仅文档 |
+| 桌面客户端（Wails: 增量同步 + 虚拟盘） | ❌ |
+| 移动客户端（React Native: 相册备份 + 离线缓存） | ❌ |
+| 测试覆盖 | ❌ 全项目 0 个测试 |
+| 性能优化（虚拟滚动/缩略图/懒加载） | ❌ |
 
-### 搜索
-- [x] 文件名搜索
-- [x] SQLite FTS5 全文搜索 (文档内容)
-- [x] 异步索引任务队列
-- [x] 文档文本提取 (txt/md/pdf/docx/xlsx/pptx)
+## 待实现
 
-### 回收站
-- [x] 删除先进回收站
-- [x] 30 天自动清理
-- [x] 恢复 & 永久删除
-
-### 文件版本
-- [x] 上传覆盖自动保存旧版本
-- [x] 版本列表/恢复/删除 API
-- [x] 可配置保留版本数 (默认 10)
-
-### 协议支持
-- [x] WebDAV (用户空间隔离 + DB 同步)
-- [x] SFTP (嵌入式 SSH 服务器)
-
-### 存储
-- [x] 本地磁盘 (原生文件夹结构)
-- [x] S3 兼容对象存储
-- [x] 完整性校验 (SHA256, 定期自动)
-- [x] 存储配额强制
-
-### 管理后台
-- [x] 审计日志查看
-- [x] 用户管理
-- [x] 权限管理
-- [x] 系统资源监控 (CPU/内存/磁盘)
-- [x] 一键备份 (SQLite VACUUM INTO)
-- [x] SSE 实时统计推送
-
-### UI
-- [x] 低饱和度浅色风格 (默认)
-- [x] 暗色模式切换 (CSS 自定义属性)
-- [x] 侧边栏导航
-- [x] 响应式空状态提示
-- [x] 零广告、零弹窗、零推荐
-- [x] 国际化基础设施 (中/英文地区文件)
-
-### 部署
-- [x] Docker 多阶段构建 (x86_64 + ARM64)
-- [x] Docker Compose 一键部署
-- [x] 裸机二进制支持
-
-## 待实现功能
-
-- [ ] 插件系统 (gRPC sidecar)
+- [ ] 插件系统 (gRPC sidecar) — SDK 目录为空
 - [ ] 桌面客户端 (Wails: 增量同步 + 虚拟盘)
 - [ ] 移动客户端 (React Native: 相册备份 + 离线缓存)
 - [ ] 测试覆盖 (目标 80%)
 - [ ] 性能优化 (虚拟滚动、缩略图、懒加载)
+- [ ] E2EE 客户端加解密
+- [ ] 移动端响应式布局
+- [ ] HTTPS/TLS 支持
+- [ ] 密码重置 / 邮件系统
+- [ ] 批量操作后端 API
+- [ ] 文件复制功能
+- [ ] i18n 接入 UI 组件
