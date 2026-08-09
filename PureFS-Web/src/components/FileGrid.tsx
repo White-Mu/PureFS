@@ -1,3 +1,4 @@
+import { files } from '../api';
 import type { FileItem } from '../api';
 
 interface FileGridProps {
@@ -7,13 +8,6 @@ interface FileGridProps {
 }
 
 export default function FileGrid({ files, onDoubleClick, onContextMenu }: FileGridProps) {
-  const icon = (f: FileItem) => f.file_type === 'directory' ? '📁' :
-    f.mime_type?.startsWith('image/') ? '🖼️' :
-    f.mime_type?.startsWith('video/') ? '🎬' :
-    f.mime_type?.startsWith('audio/') ? '🎵' :
-    f.mime_type?.includes('pdf') ? '📕' :
-    f.mime_type?.includes('zip') || f.mime_type?.includes('rar') || f.mime_type?.includes('tar') ? '📦' : '📄';
-
   return (
     <div className="grid-view">
       {files.map((f) => (
@@ -23,8 +17,27 @@ export default function FileGrid({ files, onDoubleClick, onContextMenu }: FileGr
           onDoubleClick={() => onDoubleClick(f)}
           onContextMenu={(e) => onContextMenu(e, f)}
         >
-          <div className="file-icon">{icon(f)}</div>
-          <div className="file-name">{f.name}</div>
+          <div className="file-icon">
+            {f.file_type === 'directory' ? (
+              <span style={{ fontSize: 48 }}>📁</span>
+            ) : f.mime_type?.startsWith('image/') ? (
+              <img
+                src={`${files.downloadBlobUrl(f.id)}`}
+                alt={f.name}
+                loading="lazy"
+                style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 6 }}
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            ) : (
+              <span style={{ fontSize: 36 }}>
+                {f.mime_type?.startsWith('video/') ? '🎬' :
+                 f.mime_type?.startsWith('audio/') ? '🎵' :
+                 f.mime_type?.includes('pdf') ? '📕' :
+                 f.mime_type?.includes('zip') || f.mime_type?.includes('rar') || f.mime_type?.includes('tar') ? '📦' : '📄'}
+              </span>
+            )}
+          </div>
+          <div className="file-name" title={f.name}>{f.name}</div>
         </div>
       ))}
     </div>
