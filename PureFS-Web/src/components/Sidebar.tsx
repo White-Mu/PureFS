@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore, useUIStore } from '../store';
 
 function fmtBytes(bytes: number) {
@@ -10,6 +11,7 @@ function fmtBytes(bytes: number) {
 }
 
 export default function Sidebar() {
+  const { t, i18n } = useTranslation();
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const darkMode = useUIStore((s) => s.darkMode);
   const toggleDarkMode = useUIStore((s) => s.toggleDarkMode);
@@ -22,25 +24,45 @@ export default function Sidebar() {
     navigate('/login');
   };
 
+  const toggleLang = () => {
+    const next = i18n.language === 'zh-CN' ? 'en-US' : 'zh-CN';
+    i18n.changeLanguage(next);
+  };
+
   return (
     <aside className={`sidebar ${sidebarOpen ? '' : 'collapsed'}`}>
       <div className="sidebar-header">
-        <span>PureFS</span>
+        <span>{t('app.name')}</span>
       </div>
       <nav className="sidebar-nav">
-        <NavLink to="/" end className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>📁 All Files</NavLink>
-        <NavLink to="/favorites" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>⭐ Favorites</NavLink>
-        <NavLink to="/pinned" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>📌 Pinned</NavLink>
-        <NavLink to="/recent" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>🕐 Recent</NavLink>
-        <NavLink to="/trash" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>🗑️ Trash</NavLink>
-        <NavLink to="/shares" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>🔗 Shares</NavLink>
+        <NavLink to="/" end className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          📁 {t('sidebar.allFiles')}
+        </NavLink>
+        <NavLink to="/favorites" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          ⭐ {t('sidebar.favorites')}
+        </NavLink>
+        <NavLink to="/pinned" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          📌 {t('sidebar.pinned')}
+        </NavLink>
+        <NavLink to="/recent" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          🕐 {t('sidebar.recent')}
+        </NavLink>
+        <NavLink to="/trash" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          🗑️ {t('sidebar.trash')}
+        </NavLink>
+        <NavLink to="/shares" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          🔗 {t('sidebar.shares')}
+        </NavLink>
         <div style={{ flex: 1 }} />
         <div className="nav-item" onClick={toggleDarkMode} style={{ fontSize: 13, cursor: 'pointer' }}>
-          {darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
+          {darkMode ? '☀️' : '🌙'} {t('settings.darkMode')}
+        </div>
+        <div className="nav-item" onClick={toggleLang} style={{ fontSize: 13, cursor: 'pointer' }}>
+          🌐 {i18n.language === 'zh-CN' ? 'English' : '中文'}
         </div>
         <div style={{ fontSize: 13, color: 'var(--text-secondary)', padding: '8px 12px' }}>
           {user?.username || 'User'}
-          {user?.role === 'admin' ? <span style={{ color: 'var(--accent)', fontWeight: 500 }}> · Admin</span> : null}
+          {user?.role === 'admin' ? <span style={{ color: 'var(--accent)', fontWeight: 500 }}> · {t('sidebar.admin')}</span> : null}
         </div>
         {user && user.storage_quota > 0 && (
           <div style={{ fontSize: 11, color: 'var(--text-tertiary)', padding: '0 12px 8px' }}>
@@ -48,15 +70,15 @@ export default function Sidebar() {
           </div>
         )}
         <NavLink to="/settings" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} style={{ fontSize: 13 }}>
-          ⚙ Settings
+          ⚙ {t('sidebar.settings')}
         </NavLink>
         {user?.role === 'admin' && (
           <NavLink to="/admin" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} style={{ fontSize: 13 }}>
-            🛡 Admin
+            🛡 {t('sidebar.admin')}
           </NavLink>
         )}
         <div className="nav-item" onClick={handleLogout} style={{ fontSize: 13 }}>
-          🚪 Sign Out
+          🚪 {t('sidebar.signOut')}
         </div>
       </nav>
     </aside>

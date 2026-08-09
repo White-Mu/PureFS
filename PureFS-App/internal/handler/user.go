@@ -203,3 +203,54 @@ func (h *UserHandler) AdminToggleUser(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 }
+
+// ForgotPassword generates a password reset token.
+func (h *UserHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Username string `json:"username"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	token, err := h.svc.ForgotPassword(body.Username)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Always return success to avoid user enumeration
+	if token == "" {
+		writeJSON(w, http.StatusOK, map[string]string{
+			"message": "If the account exists, a reset token has been generated.",
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message":      "Use this token to reset your password. Token expires in 1 hour.",
+		"reset_token":  token,
+	})
+}
+
+// ResetPassword sets a new password using a reset token.
+func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Token    string `json:"token"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	if err := h.svc.ResetPassword(body.Token, body.Password); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": "Password has been reset successfully.",
+	})
+}

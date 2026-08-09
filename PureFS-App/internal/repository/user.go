@@ -87,3 +87,30 @@ func (r *UserRepo) Update(u *model.User) error {
 	)
 	return err
 }
+
+func (r *UserRepo) SetResetToken(id int64, token string, expires time.Time) error {
+	_, err := r.db.Exec(
+		`UPDATE users SET reset_token=?, reset_token_expires=?, updated_at=? WHERE id=?`,
+		token, expires, time.Now(), id,
+	)
+	return err
+}
+
+func (r *UserRepo) GetByResetToken(token string) (*model.User, error) {
+	u := &model.User{}
+	var resetExpires *time.Time
+	err := r.db.QueryRow(
+		`SELECT id, username, email, password_hash, role, totp_secret, totp_enabled,
+		 storage_quota, storage_used, root_dir, is_active, ssh_public_key,
+		 reset_token, reset_token_expires, created_at, updated_at
+		 FROM users WHERE reset_token = ? AND reset_token_expires > ?`,
+		token, time.Now(),
+	).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.Role, &u.TOTPSecret, &u.TOTPEnabled,
+		&u.StorageQuota, &u.StorageUsed, &u.RootDir, &u.IsActive, &u.SSHPublicKey,
+		&u.ResetToken, &resetExpires, &u.CreatedAt, &u.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	u.ResetTokenExpires = resetExpires
+	return u, nil
+}

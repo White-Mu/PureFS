@@ -152,6 +152,10 @@ func main() {
 	r.With(middleware.RateLimit(5, 1*time.Minute)).Post("/api/auth/login", authHandler.Login)
 	r.With(middleware.RateLimit(3, 1*time.Hour)).Post("/api/auth/register", authHandler.Register)
 
+	// Password reset (public, no auth)
+	r.With(middleware.RateLimit(3, 10*time.Minute)).Post("/api/auth/forgot-password", authHandler.ForgotPassword)
+	r.With(middleware.RateLimit(5, 10*time.Minute)).Post("/api/auth/reset-password", authHandler.ResetPassword)
+
 	// Protected routes
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Auth(cfg.Auth.JWTSecret))

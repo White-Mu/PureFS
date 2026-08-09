@@ -1,7 +1,10 @@
 package service
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
+	"time"
 
 	"github.com/purefs/purefs/internal/auth"
 	"github.com/purefs/purefs/internal/config"
@@ -203,4 +206,61 @@ func (s *UserService) ToggleUserActive(userID int64, active bool) error {
 	}
 	u.IsActive = active
 	return s.userRepo.Update(u)
+}
+
+// ForgotPassword generates a reset token for the user and returns it.
+// In production, the token should be emailed; for self-hosted use, the
+// token is returned in the response so the admin can relay it.
+func (s *UserService) ForgotPassword(username string) (string, error) {
+	u, err := s.userRepo.GetByUsername(username)
+	if err != nil {
+		// Don't reveal whether the user exists
+		return "", nil
+	}
+
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("generate token: %w", err)
+	}
+	token := hex.EncodeToString(b)
+	expires := time.Now().Add(1 * time.Hour)
+
+	if err := s.userRepo.SetResetToken(u.ID, token, expires); err != nil {
+		return "", fmt.Errorf("set reset token: %w", err)
+	}
+
+	return token, nil
+}
+
+// ResetPassword validates a reset token and sets a new password.
+func (s *UserService) ResetPassword(token, newPassword string) error {
+	u, err := s.userRepo.GetByResetToken(token)
+	if err != nil {
+		return fmt.Errorf("invalid or expired reset token")
+	}
+
+	policy := s.cfg.Auth.PasswordPolicy
+	if len(newPassword) < policy.MinLength {
+		return fmt.Errorf("password must be at least %d characters", policy.MinLength)
+	}
+
+	hash, err := auth.HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("hash password: %w", err)
+	}
+
+	u.PasswordHash = hash
+	u.ResetToken = ""
+	u.ResetTokenExpires = nil
+
+	if err := s.userRepo.Update(u); err != nil {
+		return fmt.Errorf("update user: %w", err)
+	}
+
+	// Clear the reset token separately
+	if err := s.userRepo.SetResetToken(u.ID, "", time.Time{}); err != nil {
+		return fmt.Errorf("clear reset token: %w", err)
+	}
+
+	return nil
 }

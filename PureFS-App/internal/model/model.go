@@ -43,6 +43,8 @@ type User struct {
 	RootDir       string    `json:"root_dir" db:"root_dir"`
 	IsActive      bool      `json:"is_active" db:"is_active"`
 	SSHPublicKey  string    `json:"-" db:"ssh_public_key"`
+	ResetToken    string    `json:"-" db:"reset_token"`
+	ResetTokenExpires *time.Time `json:"-" db:"reset_token_expires"`
 	CreatedAt     time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
 }
