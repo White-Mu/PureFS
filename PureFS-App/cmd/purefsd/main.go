@@ -161,7 +161,8 @@ func main() {
 		r.Get("/api/users", authHandler.ListUsers)
 		r.Post("/api/auth/totp/setup", authHandler.SetupTOTP)
 		r.Post("/api/auth/totp/enable", authHandler.EnableTOTP)
-		r.Post("/api/auth/totp/disable", authHandler.DisableTOTP)
+			r.Post("/api/auth/totp/disable", authHandler.DisableTOTP)
+		r.Post("/api/auth/refresh", authHandler.Refresh)
 
 		fileHandler := handler.NewFileHandler(fileSvc)
 		fileHandler.RegisterRoutes(r)
@@ -197,6 +198,9 @@ func main() {
 			permHandler := handler.NewPermissionHandler(permRepo, userRepo)
 			permHandler.RegisterRoutes(r)
 			adminHandler.RegisterRoutes(r)
+			// Admin user management
+			r.Post("/api/admin/users", authHandler.AdminCreateUser)
+			r.Patch("/api/admin/users/{id}/toggle", authHandler.AdminToggleUser)
 		})
 	})
 

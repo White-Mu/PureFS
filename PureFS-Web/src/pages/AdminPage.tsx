@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store';
 import { admin } from '../api';
+import api from '../api/client';
 import type { User, AuditLogEntry, Permission } from '../api';
 
 export default function AdminPage() {
@@ -104,35 +105,107 @@ function AuditLogView({ logs }: { logs: AuditLogEntry[] }) {
 }
 
 function UserListView({ users }: { users: User[] }) {
+  const [showCreate, setShowCreate] = useState(false);
+  const [newUser, setNewUser] = useState({ username: '', email: '', password: '', role: 'user' });
+  const [error, setError] = useState('');
+
+  const handleCreateUser = async () => {
+    if (!newUser.username || !newUser.password) { setError('Username and password required'); return; }
+    try {
+      await api.post('/admin/users', newUser);
+      setShowCreate(false);
+      setNewUser({ username: '', email: '', password: '', role: 'user' });
+      window.location.reload();
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to create user');
+    }
+  };
+
+  const handleToggleUser = async (id: number, active: boolean) => {
+    try {
+      await api.patch(`/admin/users/${id}/toggle`, { active: !active });
+      window.location.reload();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed');
+    }
+  };
+
   return (
-    <table className="file-table">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Username</th>
-          <th>Email</th>
-          <th>Role</th>
-          <th>Storage Used</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {users.map((u) => (
-          <tr key={u.id} className="file-row">
-            <td style={{ fontSize: 14 }}>{u.id}</td>
-            <td style={{ fontSize: 14, fontWeight: 500 }}>{u.username}</td>
-            <td style={{ fontSize: 14 }}>{u.email}</td>
-            <td style={{ fontSize: 14 }}>{u.role}</td>
-            <td className="file-date">{formatBytes(u.storage_used)} / {formatBytes(u.storage_quota)}</td>
-            <td style={{ fontSize: 14 }}>
-              <span style={{ color: u.is_active ? 'var(--success)' : 'var(--text-tertiary)' }}>
-                {u.is_active ? 'Active' : 'Inactive'}
-              </span>
-            </td>
+    <div>
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{users.length} users</span>
+        <button className="btn btn-primary" style={{ fontSize: 13 }} onClick={() => setShowCreate(!showCreate)}>
+          + New User
+        </button>
+      </div>
+
+      {showCreate && (
+        <div style={{
+          background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
+          borderRadius: 'var(--radius-md)', padding: 16, marginBottom: 16,
+          display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end',
+        }}>
+          <div><label style={{ fontSize: 12, display: 'block' }}>Username</label>
+            <input value={newUser.username} onChange={e => setNewUser(p => ({ ...p, username: e.target.value }))}
+              style={{ padding: '4px 8px', width: 120, border: '1px solid var(--border-color)', borderRadius: 4, background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: 13 }} />
+          </div>
+          <div><label style={{ fontSize: 12, display: 'block' }}>Email</label>
+            <input value={newUser.email} onChange={e => setNewUser(p => ({ ...p, email: e.target.value }))}
+              style={{ padding: '4px 8px', width: 160, border: '1px solid var(--border-color)', borderRadius: 4, background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: 13 }} />
+          </div>
+          <div><label style={{ fontSize: 12, display: 'block' }}>Password</label>
+            <input type="password" value={newUser.password} onChange={e => setNewUser(p => ({ ...p, password: e.target.value }))}
+              style={{ padding: '4px 8px', width: 120, border: '1px solid var(--border-color)', borderRadius: 4, background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: 13 }} />
+          </div>
+          <div><label style={{ fontSize: 12, display: 'block' }}>Role</label>
+            <select value={newUser.role} onChange={e => setNewUser(p => ({ ...p, role: e.target.value }))}
+              style={{ padding: '4px 8px', border: '1px solid var(--border-color)', borderRadius: 4, background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: 13 }}>
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <button className="btn btn-primary" style={{ fontSize: 13, padding: '4px 12px' }} onClick={handleCreateUser}>Create</button>
+          <button className="btn" style={{ fontSize: 13, padding: '4px 12px' }} onClick={() => setShowCreate(false)}>Cancel</button>
+          {error && <span style={{ color: 'var(--danger)', fontSize: 12 }}>{error}</span>}
+        </div>
+      )}
+
+      <table className="file-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Username</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Storage Used</th>
+            <th>Status</th>
+            <th></th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {users.map((u) => (
+            <tr key={u.id} className="file-row">
+              <td style={{ fontSize: 14 }}>{u.id}</td>
+              <td style={{ fontSize: 14, fontWeight: 500 }}>{u.username}</td>
+              <td style={{ fontSize: 14 }}>{u.email}</td>
+              <td style={{ fontSize: 14 }}>{u.role}</td>
+              <td className="file-date">{formatBytes(u.storage_used)} / {formatBytes(u.storage_quota)}</td>
+              <td style={{ fontSize: 14 }}>
+                <span style={{ color: u.is_active ? 'var(--success)' : 'var(--text-tertiary)' }}>
+                  {u.is_active ? 'Active' : 'Inactive'}
+                </span>
+              </td>
+              <td>
+                <button className="btn" style={{ fontSize: 11, padding: '2px 6px' }}
+                  onClick={() => handleToggleUser(u.id, u.is_active)}>
+                  {u.is_active ? 'Disable' : 'Enable'}
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

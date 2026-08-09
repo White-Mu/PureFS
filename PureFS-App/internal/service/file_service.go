@@ -387,6 +387,92 @@ func (s *FileService) DownloadPublic(fileID int64) (io.ReadCloser, *model.File, 
 	return reader, f, nil
 }
 
+// Copy creates a copy of a file within the target directory.
+func (s *FileService) Copy(userID int64, fileID int64, targetParentID *int64, newName string) (*model.File, error) {
+	src, err := s.fileRepo.GetByID(fileID)
+	if err != nil {
+		return nil, fmt.Errorf("source file not found: %w", err)
+	}
+	if err := s.checkPerm(userID, src, "read"); err != nil {
+		return nil, err
+	}
+
+	if targetParentID != nil {
+		target, err := s.fileRepo.GetByID(*targetParentID)
+		if err != nil {
+			return nil, fmt.Errorf("target not found: %w", err)
+		}
+		if err := s.checkPerm(userID, target, "write"); err != nil {
+			return nil, err
+		}
+	}
+
+	if newName == "" {
+		newName = src.Name
+	}
+
+	userPath := fmt.Sprintf("/users/%d", userID)
+	dstPath := filepath.Join(userPath, newName)
+	if targetParentID != nil {
+		var target *model.File
+		target, err = s.fileRepo.GetByID(*targetParentID)
+		if err != nil {
+			return nil, fmt.Errorf("target parent not found: %w", err)
+		}
+		dstPath = filepath.Join(target.Path, newName)
+	}
+
+	// Open source and copy bytes
+	srcReader, err := s.store.Open(src.Path)
+	if err != nil {
+		return nil, fmt.Errorf("open source: %w", err)
+	}
+	defer srcReader.Close()
+
+	dstWriter, err := s.store.Create(dstPath)
+	if err != nil {
+		return nil, fmt.Errorf("create destination: %w", err)
+	}
+
+	h := sha256.New()
+	size, err := io.Copy(io.MultiWriter(dstWriter, h), srcReader)
+	if err != nil {
+		dstWriter.Close()
+		s.store.Delete(dstPath)
+		return nil, fmt.Errorf("copy data: %w", err)
+	}
+	if err := dstWriter.Close(); err != nil {
+		s.store.Delete(dstPath)
+		return nil, fmt.Errorf("finalize copy: %w", err)
+	}
+
+	f := &model.File{
+		UserID:   userID,
+		ParentID: targetParentID,
+		Name:     newName,
+		Path:     dstPath,
+		RealPath: s.store.RealPath(dstPath),
+		FileType: src.FileType,
+		MimeType: src.MimeType,
+		Size:     size,
+		SHA256:   hex.EncodeToString(h.Sum(nil)),
+	}
+
+	if err := s.fileRepo.Create(f); err != nil {
+		s.store.Delete(dstPath)
+		return nil, fmt.Errorf("create copy record: %w", err)
+	}
+
+	// Update storage used
+	if size > 0 {
+		if err := s.userRepo.UpdateStorageUsed(userID, size); err != nil {
+			return nil, fmt.Errorf("update storage used: %w", err)
+		}
+	}
+
+	return f, nil
+}
+
 func detectMimeType(name string) string {
 	ext := strings.ToLower(filepath.Ext(name))
 	mimeMap := map[string]string{

@@ -86,6 +86,27 @@ func (s *UserService) GetUser(id int64) (*model.User, error) {
 	return s.userRepo.GetByID(id)
 }
 
+func (s *UserService) RefreshToken(userID int64) (*model.LoginResponse, error) {
+	u, err := s.userRepo.GetByID(userID)
+	if err != nil {
+		return nil, fmt.Errorf("user not found: %w", err)
+	}
+
+	if !u.IsActive {
+		return nil, fmt.Errorf("account is disabled")
+	}
+
+	token, err := jwtutil.GenerateToken(u.ID, u.Username, u.Role, s.cfg.Auth.JWTSecret, s.cfg.Auth.JWTExpiry)
+	if err != nil {
+		return nil, fmt.Errorf("generate token: %w", err)
+	}
+
+	return &model.LoginResponse{
+		Token: token,
+		User:  *u,
+	}, nil
+}
+
 func (s *UserService) ListUsers() ([]*model.User, error) {
 	return s.userRepo.List()
 }
@@ -132,5 +153,54 @@ func (s *UserService) DisableTOTP(userID int64) error {
 	}
 	u.TOTPEnabled = false
 	u.TOTPSecret = ""
+	return s.userRepo.Update(u)
+}
+
+// AdminCreateUser creates a new user as an admin. It validates password policy
+// and checks for duplicate usernames before creating.
+func (s *UserService) AdminCreateUser(username, email, password, role string) (*model.User, error) {
+	if username == "" || password == "" {
+		return nil, fmt.Errorf("username and password are required")
+	}
+
+	// Check for duplicate
+	if existing, _ := s.userRepo.GetByUsername(username); existing != nil {
+		return nil, fmt.Errorf("username already exists")
+	}
+
+	// Validate password policy
+	policy := s.cfg.Auth.PasswordPolicy
+	if len(password) < policy.MinLength {
+		return nil, fmt.Errorf("password must be at least %d characters", policy.MinLength)
+	}
+
+	hash, err := auth.HashPassword(password)
+	if err != nil {
+		return nil, fmt.Errorf("hash password: %w", err)
+	}
+
+	u := &model.User{
+		Username:     username,
+		Email:        email,
+		PasswordHash: hash,
+		Role:         role,
+		IsActive:     true,
+		StorageQuota: 10 << 30, // 10 GB default
+	}
+
+	if err := s.userRepo.Create(u); err != nil {
+		return nil, fmt.Errorf("create user: %w", err)
+	}
+
+	return u, nil
+}
+
+// ToggleUserActive enables or disables a user account.
+func (s *UserService) ToggleUserActive(userID int64, active bool) error {
+	u, err := s.userRepo.GetByID(userID)
+	if err != nil {
+		return fmt.Errorf("user not found: %w", err)
+	}
+	u.IsActive = active
 	return s.userRepo.Update(u)
 }

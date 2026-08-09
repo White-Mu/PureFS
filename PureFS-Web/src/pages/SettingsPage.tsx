@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAuthStore } from '../store';
 import { auth } from '../api';
+import QRCode from 'qrcode';
 
 export default function SettingsPage() {
   const user = useAuthStore((s) => s.user);
@@ -10,6 +11,7 @@ export default function SettingsPage() {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const handleSetup = async () => {
     setLoading(true);
@@ -25,6 +27,13 @@ export default function SettingsPage() {
       setLoading(false);
     }
   };
+
+  // Generate QR code locally when URI is set
+  useEffect(() => {
+    if (uri && qrCanvasRef.current) {
+      QRCode.toCanvas(qrCanvasRef.current, uri, { width: 200, margin: 1 });
+    }
+  }, [uri]);
 
   const handleEnable = async () => {
     setLoading(true);
@@ -100,8 +109,7 @@ export default function SettingsPage() {
                 background: '#fff', padding: 16, borderRadius: 8, marginBottom: 16,
                 display: 'flex', justifyContent: 'center',
               }}>
-                <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(uri)}`}
-                  alt="TOTP QR Code" style={{ width: 200, height: 200 }} />
+                <canvas ref={qrCanvasRef} width={200} height={200} style={{ width: 200, height: 200 }} />
               </div>
               <div style={{ marginBottom: 16 }}>
                 <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 4 }}>Secret Key</label>

@@ -69,6 +69,8 @@ export const auth = {
 
   me: () => api.get<User>('/users/me').then(r => r.data),
 
+  refresh: () => api.post<LoginResponse>('/auth/refresh').then(r => r.data),
+
   setupTOTP: () => api.post<{ secret: string; uri: string }>('/auth/totp/setup').then(r => r.data),
 
   enableTOTP: (code: string) => api.post('/auth/totp/enable', { code }),
@@ -119,6 +121,12 @@ export const files = {
 
   setFavorite: (id: number, favorite: boolean) =>
     api.patch(`/files/${id}/favorite`, { favorite }),
+
+  copy: (id: number, data?: { target_parent_id?: number; new_name?: string }) =>
+    api.post<FileItem>(`/files/${id}/copy`, data || {}).then(r => r.data),
+
+  batchDelete: (ids: number[]) =>
+    api.post<{ deleted: number; failed: number[] }>('/files/batch/delete', { ids }).then(r => r.data),
 };
 
 export const shares = {

@@ -30,8 +30,10 @@ func (h *FileHandler) RegisterRoutes(r chi.Router) {
 	r.Patch("/api/files/{id}/rename", h.Rename)
 	r.Patch("/api/files/{id}/move", h.Move)
 	r.Delete("/api/files/{id}", h.Delete)
+	r.Post("/api/files/{id}/copy", h.Copy)
 	r.Patch("/api/files/{id}/pin", h.SetPinned)
 	r.Patch("/api/files/{id}/favorite", h.SetFavorite)
+	r.Post("/api/files/batch/delete", h.BatchDelete)
 }
 
 func (h *FileHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -313,4 +315,61 @@ func (h *FileHandler) SetFavorite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (h *FileHandler) Copy(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r.Context())
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid file id")
+		return
+	}
+
+	var body struct {
+		TargetParentID *int64 `json:"target_parent_id"`
+		NewName        string `json:"new_name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		// Allow empty body (copy to same directory with same name)
+		body = struct {
+			TargetParentID *int64 `json:"target_parent_id"`
+			NewName        string `json:"new_name"`
+		}{}
+	}
+
+	f, err := h.svc.Copy(userID, id, body.TargetParentID, body.NewName)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, f)
+}
+
+func (h *FileHandler) BatchDelete(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r.Context())
+	var body struct {
+		IDs []int64 `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if len(body.IDs) == 0 {
+		writeError(w, http.StatusBadRequest, "no file ids provided")
+		return
+	}
+
+	var failed []int64
+	for _, id := range body.IDs {
+		if err := h.svc.Delete(userID, id); err != nil {
+			failed = append(failed, id)
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"deleted": len(body.IDs) - len(failed),
+		"failed":  failed,
+	})
 }
