@@ -10,7 +10,7 @@
 
 ### 2.1 users — 用户表
 
-创建于迁移 `001_init`。
+创建于迁移 `001_init`，`007_password_reset` 增加密码重置字段，`008_e2ee` 增加 E2EE 字段。
 
 ```sql
 CREATE TABLE IF NOT EXISTS users (
@@ -25,6 +25,10 @@ CREATE TABLE IF NOT EXISTS users (
     storage_used INTEGER NOT NULL DEFAULT 0,
     root_dir TEXT NOT NULL DEFAULT '/',
     is_active INTEGER NOT NULL DEFAULT 1,
+    reset_token TEXT NOT NULL DEFAULT '',          -- 007：密码重置令牌
+    reset_token_expires DATETIME,                  -- 007：重置令牌过期时间
+    e2ee_salt TEXT NOT NULL DEFAULT '',            -- 008：E2EE PBKDF2 盐
+    e2ee_wrapped_key TEXT NOT NULL DEFAULT '',     -- 008：口令包装后的主密钥（服务器无法解开）
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -32,7 +36,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 ### 2.2 files — 文件/目录索引
 
-创建于迁移 `001_init`。
+创建于迁移 `001_init`，`003_encryption` 增加服务端加密字段，`008_e2ee` 增加 E2EE 标志。
 
 `is_pinned` 和 `is_favorite` 作为列直接存放在 files 表中，不再使用独立的 favorites / pinned_items 表。
 
@@ -50,7 +54,10 @@ CREATE TABLE IF NOT EXISTS files (
     sha256 TEXT NOT NULL DEFAULT '',
     is_pinned INTEGER NOT NULL DEFAULT 0,
     is_favorite INTEGER NOT NULL DEFAULT 0,
-    is_encrypted INTEGER NOT NULL DEFAULT 0,
+    is_encrypted INTEGER NOT NULL DEFAULT 0,       -- 003：服务端透明加密
+    dek_ciphertext TEXT NOT NULL DEFAULT '',       -- 003：加密后的 DEK（E2EE 时为客户端包装 DEK）
+    kek_version INTEGER NOT NULL DEFAULT 0,        -- 003：KEK 版本（0 = 客户端 E2EE 包装）
+    is_e2ee INTEGER NOT NULL DEFAULT 0,            -- 008：文件字节为客户端加密密文
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, parent_id, name)
@@ -196,6 +203,11 @@ CREATE TABLE search_index_meta (
 |---|---|---|
 | `internal/database/migrations/001_init.sql` | users, files, shares, permissions, audit_logs, integrity_records | 已实现 |
 | `internal/database/migrations/002_recycle_bin.sql` | recycle_bin | 已实现 |
+| `internal/database/migrations/003_encryption.sql` | files 加 dek_ciphertext, kek_version | 已实现 |
+| `internal/database/migrations/005_sftp_keys.sql` | users 加 ssh_public_key | 已实现 |
+| `internal/database/migrations/006_file_versions.sql` | file_versions | 已实现 |
+| `internal/database/migrations/007_password_reset.sql` | users 加 reset_token, reset_token_expires | 已实现 |
+| `internal/database/migrations/008_e2ee.sql` | users 加 e2ee_salt, e2ee_wrapped_key；files 加 is_e2ee | 已实现 |
 | （未来迁移） | file_meta | 计划中 |
 | （未来迁移） | search_index_meta | 计划中 |
 

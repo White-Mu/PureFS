@@ -134,6 +134,33 @@ log:
   audit_enabled: true
 ```
 
+### 4.1 启用 HTTPS/TLS
+
+在配置文件中加入 `tls` 段：
+
+```yaml
+tls:
+  enabled: true
+  # 方式一：提供正式证书
+  cert: /etc/purefs/tls/cert.pem
+  key: /etc/purefs/tls/key.pem
+  # 方式二：auto: true 时首次启动自动生成自签证书（无需手动提供）
+  auto: true
+```
+
+- `auto: true`：自动生成 ECDSA P-256 自签证书（有效期 365 天），适合内网/测试环境
+- 提供 `cert`/`key`：使用正式证书（如 Let's Encrypt）
+
+### 4.2 端到端加密（E2EE）
+
+E2EE 是**纯客户端功能**，无需服务端配置。用户在浏览器设置页开启后：
+
+- 文件在浏览器内加密后上传，服务器只存密文
+- 下载/预览时在浏览器内解密
+- 服务器持有包装后的主密钥，无法解密任何内容
+
+注意：E2EE 与服务端透明加密（`encryption.enabled`）互相独立，可单独或同时开启。
+
 ## 5. 最低配置要求
 
 | 规格 | 配置 |

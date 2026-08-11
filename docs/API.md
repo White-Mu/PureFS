@@ -182,3 +182,41 @@ Query: q=xxx&type=all|file|document|image&offset=0&limit=50
 Query: user_id=xxx&action=xxx&from=xxx&to=xxx&offset=0&limit=50
 → { "items": [{ ... }], "total": ... }
 ```
+
+## 12. 端到端加密 API（E2EE）
+
+E2EE 采用信封加密，密钥在客户端生成，服务器只存密文。详见 [AUTH.md](AUTH.md)。
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/users/e2ee/status` | 查询是否启用 + salt / 包装主密钥 |
+| POST | `/users/e2ee` | 启用：上传 salt + 包装主密钥 |
+| DELETE | `/users/e2ee` | 关闭：清除密钥（已有密文不可再解密） |
+
+### GET /users/e2ee/status
+
+```
+→ { "enabled": true, "salt": "...", "wrapped_key": "..." }
+```
+
+### POST /users/e2ee
+
+```json
+{
+  "salt": "base64(16字节随机盐)",
+  "wrapped_key": "base64(nonce(12) + AES-GCM(主密钥, KEK))"
+}
+```
+
+### E2EE 文件上传
+
+`POST /files/upload`（multipart）额外字段：
+
+```
+is_e2ee=true
+dek_ciphertext=<base64(nonce(12) + AES-GCM(文件DEK, 主密钥))>
+kek_version=0
+```
+
+- 文件字节已是客户端加密后的密文，服务器原样存储
+- `kek_version=0` 标记客户端包装 DEK（服务端透明加密使用 >=1）
