@@ -22,9 +22,9 @@ func (r *FileRepo) Create(f *model.File) error {
 	f.CreatedAt = now
 	f.UpdatedAt = now
 	res, err := r.db.Exec(
-		`INSERT INTO files (user_id, parent_id, name, path, real_path, file_type, mime_type, size, sha256, is_pinned, is_favorite, is_encrypted, dek_ciphertext, kek_version, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		f.UserID, f.ParentID, f.Name, f.Path, f.RealPath, f.FileType, f.MimeType, f.Size, f.SHA256, f.IsPinned, f.IsFavorite, f.IsEncrypted, f.DEKCiphertext, f.KEKVersion, f.CreatedAt, f.UpdatedAt,
+		`INSERT INTO files (user_id, parent_id, name, path, real_path, file_type, mime_type, size, sha256, is_pinned, is_favorite, is_encrypted, dek_ciphertext, kek_version, is_e2ee, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		f.UserID, f.ParentID, f.Name, f.Path, f.RealPath, f.FileType, f.MimeType, f.Size, f.SHA256, f.IsPinned, f.IsFavorite, f.IsEncrypted, f.DEKCiphertext, f.KEKVersion, f.IsE2EE, f.CreatedAt, f.UpdatedAt,
 	)
 	if err != nil {
 		return err
@@ -37,9 +37,9 @@ func (r *FileRepo) Create(f *model.File) error {
 func (r *FileRepo) GetByID(id int64) (*model.File, error) {
 	f := &model.File{}
 	err := r.db.QueryRow(
-		`SELECT id, user_id, parent_id, name, path, real_path, file_type, mime_type, size, sha256, is_pinned, is_favorite, is_encrypted, dek_ciphertext, kek_version, created_at, updated_at
+		`SELECT id, user_id, parent_id, name, path, real_path, file_type, mime_type, size, sha256, is_pinned, is_favorite, is_encrypted, dek_ciphertext, kek_version, is_e2ee, created_at, updated_at
 		 FROM files WHERE id = ?`, id,
-	).Scan(&f.ID, &f.UserID, &f.ParentID, &f.Name, &f.Path, &f.RealPath, &f.FileType, &f.MimeType, &f.Size, &f.SHA256, &f.IsPinned, &f.IsFavorite, &f.IsEncrypted, &f.DEKCiphertext, &f.KEKVersion, &f.CreatedAt, &f.UpdatedAt)
+	).Scan(&f.ID, &f.UserID, &f.ParentID, &f.Name, &f.Path, &f.RealPath, &f.FileType, &f.MimeType, &f.Size, &f.SHA256, &f.IsPinned, &f.IsFavorite, &f.IsEncrypted, &f.DEKCiphertext, &f.KEKVersion, &f.IsE2EE, &f.CreatedAt, &f.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -49,9 +49,9 @@ func (r *FileRepo) GetByID(id int64) (*model.File, error) {
 func (r *FileRepo) GetByUserAndPath(userID int64, path string) (*model.File, error) {
 	f := &model.File{}
 	err := r.db.QueryRow(
-		`SELECT id, user_id, parent_id, name, path, real_path, file_type, mime_type, size, sha256, is_pinned, is_favorite, is_encrypted, dek_ciphertext, kek_version, created_at, updated_at
+		`SELECT id, user_id, parent_id, name, path, real_path, file_type, mime_type, size, sha256, is_pinned, is_favorite, is_encrypted, dek_ciphertext, kek_version, is_e2ee, created_at, updated_at
 		 FROM files WHERE user_id = ? AND path = ?`, userID, path,
-	).Scan(&f.ID, &f.UserID, &f.ParentID, &f.Name, &f.Path, &f.RealPath, &f.FileType, &f.MimeType, &f.Size, &f.SHA256, &f.IsPinned, &f.IsFavorite, &f.IsEncrypted, &f.DEKCiphertext, &f.KEKVersion, &f.CreatedAt, &f.UpdatedAt)
+	).Scan(&f.ID, &f.UserID, &f.ParentID, &f.Name, &f.Path, &f.RealPath, &f.FileType, &f.MimeType, &f.Size, &f.SHA256, &f.IsPinned, &f.IsFavorite, &f.IsEncrypted, &f.DEKCiphertext, &f.KEKVersion, &f.IsE2EE, &f.CreatedAt, &f.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func (r *FileRepo) List(q model.FileListQuery) ([]*model.File, int64, error) {
 	}
 
 	query := fmt.Sprintf(
-		`SELECT id, user_id, parent_id, name, path, real_path, file_type, mime_type, size, sha256, is_pinned, is_favorite, is_encrypted, dek_ciphertext, kek_version, created_at, updated_at
+		`SELECT id, user_id, parent_id, name, path, real_path, file_type, mime_type, size, sha256, is_pinned, is_favorite, is_encrypted, dek_ciphertext, kek_version, is_e2ee, created_at, updated_at
 		 FROM files WHERE %s ORDER BY is_pinned DESC, %s %s LIMIT ? OFFSET ?`,
 		whereClause, sortBy, sortOrder,
 	)
@@ -122,7 +122,7 @@ func (r *FileRepo) List(q model.FileListQuery) ([]*model.File, int64, error) {
 	var files []*model.File
 	for rows.Next() {
 		f := &model.File{}
-		if err := rows.Scan(&f.ID, &f.UserID, &f.ParentID, &f.Name, &f.Path, &f.RealPath, &f.FileType, &f.MimeType, &f.Size, &f.SHA256, &f.IsPinned, &f.IsFavorite, &f.IsEncrypted, &f.DEKCiphertext, &f.KEKVersion, &f.CreatedAt, &f.UpdatedAt); err != nil {
+		if err := rows.Scan(&f.ID, &f.UserID, &f.ParentID, &f.Name, &f.Path, &f.RealPath, &f.FileType, &f.MimeType, &f.Size, &f.SHA256, &f.IsPinned, &f.IsFavorite, &f.IsEncrypted, &f.DEKCiphertext, &f.KEKVersion, &f.IsE2EE, &f.CreatedAt, &f.UpdatedAt); err != nil {
 			return nil, 0, err
 		}
 		files = append(files, f)
@@ -172,7 +172,7 @@ func (r *FileRepo) ListByParent(userID int64, parentID *int64, q model.FileListQ
 	}
 
 	query := fmt.Sprintf(
-		`SELECT id, user_id, parent_id, name, path, real_path, file_type, mime_type, size, sha256, is_pinned, is_favorite, is_encrypted, dek_ciphertext, kek_version, created_at, updated_at
+		`SELECT id, user_id, parent_id, name, path, real_path, file_type, mime_type, size, sha256, is_pinned, is_favorite, is_encrypted, dek_ciphertext, kek_version, is_e2ee, created_at, updated_at
 		 FROM files WHERE %s ORDER BY is_pinned DESC, %s %s LIMIT ? OFFSET ?`,
 		whereClause, sortBy, sortOrder,
 	)
@@ -187,7 +187,7 @@ func (r *FileRepo) ListByParent(userID int64, parentID *int64, q model.FileListQ
 	var files []*model.File
 	for rows.Next() {
 		f := &model.File{}
-		if err := rows.Scan(&f.ID, &f.UserID, &f.ParentID, &f.Name, &f.Path, &f.RealPath, &f.FileType, &f.MimeType, &f.Size, &f.SHA256, &f.IsPinned, &f.IsFavorite, &f.IsEncrypted, &f.DEKCiphertext, &f.KEKVersion, &f.CreatedAt, &f.UpdatedAt); err != nil {
+		if err := rows.Scan(&f.ID, &f.UserID, &f.ParentID, &f.Name, &f.Path, &f.RealPath, &f.FileType, &f.MimeType, &f.Size, &f.SHA256, &f.IsPinned, &f.IsFavorite, &f.IsEncrypted, &f.DEKCiphertext, &f.KEKVersion, &f.IsE2EE, &f.CreatedAt, &f.UpdatedAt); err != nil {
 			return nil, 0, err
 		}
 		files = append(files, f)
@@ -198,9 +198,9 @@ func (r *FileRepo) ListByParent(userID int64, parentID *int64, q model.FileListQ
 func (r *FileRepo) Update(f *model.File) error {
 	f.UpdatedAt = time.Now()
 	_, err := r.db.Exec(
-		`UPDATE files SET parent_id=?, name=?, path=?, real_path=?, mime_type=?, size=?, sha256=?, is_pinned=?, is_favorite=?, is_encrypted=?, updated_at=?
+		`UPDATE files SET parent_id=?, name=?, path=?, real_path=?, mime_type=?, size=?, sha256=?, is_pinned=?, is_favorite=?, is_encrypted=?, dek_ciphertext=?, kek_version=?, is_e2ee=?, updated_at=?
 		 WHERE id=?`,
-		f.ParentID, f.Name, f.Path, f.RealPath, f.MimeType, f.Size, f.SHA256, f.IsPinned, f.IsFavorite, f.IsEncrypted, f.UpdatedAt, f.ID,
+		f.ParentID, f.Name, f.Path, f.RealPath, f.MimeType, f.Size, f.SHA256, f.IsPinned, f.IsFavorite, f.IsEncrypted, f.DEKCiphertext, f.KEKVersion, f.IsE2EE, f.UpdatedAt, f.ID,
 	)
 	return err
 }

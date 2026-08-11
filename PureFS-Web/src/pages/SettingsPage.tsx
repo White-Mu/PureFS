@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuthStore } from '../store';
+import { useE2EEStore } from '../store/e2ee';
 import { auth } from '../api';
 import QRCode from 'qrcode';
+import E2EESettings from '../components/E2EESettings';
 
 export default function SettingsPage() {
   const user = useAuthStore((s) => s.user);
@@ -12,6 +14,13 @@ export default function SettingsPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
+  const statusLoaded = useE2EEStore((s) => s.statusLoaded);
+  const loadStatus = useE2EEStore((s) => s.loadStatus);
+
+  // Load E2EE status on mount.
+  useEffect(() => {
+    if (!statusLoaded) loadStatus();
+  }, [statusLoaded, loadStatus]);
 
   const handleSetup = async () => {
     setLoading(true);
@@ -72,6 +81,8 @@ export default function SettingsPage() {
         </div>
       </div>
       <div className="file-area" style={{ maxWidth: 600 }}>
+        <E2EESettings />
+
         <div style={{
           background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
           borderRadius: 'var(--radius-md)', padding: 24, marginBottom: 16,

@@ -20,6 +20,8 @@ export default function FileGrid({ files, onDoubleClick, onContextMenu }: FileGr
           <div className="file-icon">
             {f.file_type === 'directory' ? (
               <span style={{ fontSize: 48 }}>📁</span>
+            ) : f.is_e2ee ? (
+              <span style={{ fontSize: 36 }} title="End-to-end encrypted">🔒</span>
             ) : f.mime_type?.startsWith('image/') ? (
               <img
                 src={`${files.downloadBlobUrl(f.id)}`}

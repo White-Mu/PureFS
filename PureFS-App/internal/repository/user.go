@@ -20,9 +20,9 @@ func (r *UserRepo) Create(u *model.User) error {
 	u.CreatedAt = now
 	u.UpdatedAt = now
 	res, err := r.db.Exec(
-		`INSERT INTO users (username, email, password_hash, role, totp_secret, totp_enabled, storage_quota, root_dir, is_active, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		u.Username, u.Email, u.PasswordHash, u.Role, u.TOTPSecret, u.TOTPEnabled, u.StorageQuota, u.RootDir, u.IsActive, u.CreatedAt, u.UpdatedAt,
+		`INSERT INTO users (username, email, password_hash, role, totp_secret, totp_enabled, storage_quota, root_dir, is_active, e2ee_salt, e2ee_wrapped_key, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		u.Username, u.Email, u.PasswordHash, u.Role, u.TOTPSecret, u.TOTPEnabled, u.StorageQuota, u.RootDir, u.IsActive, u.E2EESalt, u.E2EEWrappedKey, u.CreatedAt, u.UpdatedAt,
 	)
 	if err != nil {
 		return err
@@ -35,9 +35,9 @@ func (r *UserRepo) Create(u *model.User) error {
 func (r *UserRepo) GetByID(id int64) (*model.User, error) {
 	u := &model.User{}
 	err := r.db.QueryRow(
-		`SELECT id, username, email, password_hash, role, totp_secret, totp_enabled, storage_quota, storage_used, root_dir, is_active, ssh_public_key, created_at, updated_at
+		`SELECT id, username, email, password_hash, role, totp_secret, totp_enabled, storage_quota, storage_used, root_dir, is_active, ssh_public_key, e2ee_salt, e2ee_wrapped_key, created_at, updated_at
 		 FROM users WHERE id = ?`, id,
-	).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.Role, &u.TOTPSecret, &u.TOTPEnabled, &u.StorageQuota, &u.StorageUsed, &u.RootDir, &u.IsActive, &u.SSHPublicKey, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.Role, &u.TOTPSecret, &u.TOTPEnabled, &u.StorageQuota, &u.StorageUsed, &u.RootDir, &u.IsActive, &u.SSHPublicKey, &u.E2EESalt, &u.E2EEWrappedKey, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -47,9 +47,9 @@ func (r *UserRepo) GetByID(id int64) (*model.User, error) {
 func (r *UserRepo) GetByUsername(username string) (*model.User, error) {
 	u := &model.User{}
 	err := r.db.QueryRow(
-		`SELECT id, username, email, password_hash, role, totp_secret, totp_enabled, storage_quota, storage_used, root_dir, is_active, ssh_public_key, created_at, updated_at
+		`SELECT id, username, email, password_hash, role, totp_secret, totp_enabled, storage_quota, storage_used, root_dir, is_active, ssh_public_key, e2ee_salt, e2ee_wrapped_key, created_at, updated_at
 		 FROM users WHERE username = ?`, username,
-	).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.Role, &u.TOTPSecret, &u.TOTPEnabled, &u.StorageQuota, &u.StorageUsed, &u.RootDir, &u.IsActive, &u.SSHPublicKey, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.Role, &u.TOTPSecret, &u.TOTPEnabled, &u.StorageQuota, &u.StorageUsed, &u.RootDir, &u.IsActive, &u.SSHPublicKey, &u.E2EESalt, &u.E2EEWrappedKey, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -96,18 +96,36 @@ func (r *UserRepo) SetResetToken(id int64, token string, expires time.Time) erro
 	return err
 }
 
+// SetE2EEKeys stores the E2EE salt and wrapped master key for a user.
+func (r *UserRepo) SetE2EEKeys(id int64, salt, wrappedKey string) error {
+	_, err := r.db.Exec(
+		`UPDATE users SET e2ee_salt=?, e2ee_wrapped_key=?, updated_at=? WHERE id=?`,
+		salt, wrappedKey, time.Now(), id,
+	)
+	return err
+}
+
+// ClearE2EE disables E2EE for a user by removing the salt and wrapped key.
+func (r *UserRepo) ClearE2EE(id int64) error {
+	_, err := r.db.Exec(
+		`UPDATE users SET e2ee_salt='', e2ee_wrapped_key='', updated_at=? WHERE id=?`,
+		time.Now(), id,
+	)
+	return err
+}
+
 func (r *UserRepo) GetByResetToken(token string) (*model.User, error) {
 	u := &model.User{}
 	var resetExpires *time.Time
 	err := r.db.QueryRow(
 		`SELECT id, username, email, password_hash, role, totp_secret, totp_enabled,
 		 storage_quota, storage_used, root_dir, is_active, ssh_public_key,
-		 reset_token, reset_token_expires, created_at, updated_at
+		 reset_token, reset_token_expires, e2ee_salt, e2ee_wrapped_key, created_at, updated_at
 		 FROM users WHERE reset_token = ? AND reset_token_expires > ?`,
 		token, time.Now(),
 	).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.Role, &u.TOTPSecret, &u.TOTPEnabled,
 		&u.StorageQuota, &u.StorageUsed, &u.RootDir, &u.IsActive, &u.SSHPublicKey,
-		&u.ResetToken, &resetExpires, &u.CreatedAt, &u.UpdatedAt)
+		&u.ResetToken, &resetExpires, &u.E2EESalt, &u.E2EEWrappedKey, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}

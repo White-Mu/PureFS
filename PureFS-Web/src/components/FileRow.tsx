@@ -66,6 +66,7 @@ export default function FileRow({
           </span>
           {file.is_pinned && <span className="pinned-badge" title="Pinned">📌</span>}
           {file.is_favorite && <span className="pinned-badge" title="Favorite">⭐</span>}
+          {file.is_e2ee && <span className="pinned-badge" title="End-to-end encrypted">🔒</span>}
         </div>
       </td>
       <td className="file-size">{file.file_type === 'directory' ? '-' : formatSize(file.size)}</td>

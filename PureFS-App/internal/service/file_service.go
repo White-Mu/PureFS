@@ -143,7 +143,20 @@ func (s *FileService) CreateDir(userID int64, parentID *int64, name string) (*mo
 	return f, nil
 }
 
+// UploadOptions carries optional metadata for an upload. When IsE2EE is true,
+// the reader carries client-encrypted ciphertext and the server stores it
+// verbatim without ever seeing the plaintext.
+type UploadOptions struct {
+	IsE2EE       bool
+	DEKCiphertext string
+	KEKVersion    int64
+}
+
 func (s *FileService) Upload(userID int64, parentID *int64, name string, reader io.Reader) (*model.File, error) {
+	return s.UploadWithOptions(userID, parentID, name, reader, UploadOptions{})
+}
+
+func (s *FileService) UploadWithOptions(userID int64, parentID *int64, name string, reader io.Reader, opts UploadOptions) (*model.File, error) {
 	userPath := fmt.Sprintf("/users/%d", userID)
 	filePath := filepath.Join(userPath, name)
 
@@ -206,15 +219,18 @@ func (s *FileService) Upload(userID int64, parentID *int64, name string, reader 
 	mimeType := detectMimeType(name)
 
 	f := &model.File{
-		UserID:   userID,
-		ParentID: parentID,
-		Name:     name,
-		Path:     filePath,
-		RealPath: s.store.RealPath(filePath),
-		FileType: model.FileTypeFile,
-		MimeType: mimeType,
-		Size:     size,
-		SHA256:   sha256Hex,
+		UserID:        userID,
+		ParentID:      parentID,
+		Name:          name,
+		Path:          filePath,
+		RealPath:      s.store.RealPath(filePath),
+		FileType:      model.FileTypeFile,
+		MimeType:      mimeType,
+		Size:          size,
+		SHA256:        sha256Hex,
+		IsE2EE:        opts.IsE2EE,
+		DEKCiphertext: opts.DEKCiphertext,
+		KEKVersion:    opts.KEKVersion,
 	}
 
 	if err := s.fileRepo.Create(f); err != nil {
@@ -226,8 +242,8 @@ func (s *FileService) Upload(userID int64, parentID *int64, name string, reader 
 		return nil, fmt.Errorf("update storage used: %w", err)
 	}
 
-	// Submit async indexing task
-	if s.searchSvc != nil {
+	// Submit async indexing task (E2EE ciphertext is not indexable)
+	if s.searchSvc != nil && !opts.IsE2EE {
 		s.searchSvc.IndexFileAsync(f.ID, userID)
 	}
 
@@ -465,15 +481,18 @@ func (s *FileService) Copy(userID int64, fileID int64, targetParentID *int64, ne
 	}
 
 	f := &model.File{
-		UserID:   userID,
-		ParentID: targetParentID,
-		Name:     newName,
-		Path:     dstPath,
-		RealPath: s.store.RealPath(dstPath),
-		FileType: src.FileType,
-		MimeType: src.MimeType,
-		Size:     size,
-		SHA256:   hex.EncodeToString(h.Sum(nil)),
+		UserID:        userID,
+		ParentID:      targetParentID,
+		Name:          newName,
+		Path:          dstPath,
+		RealPath:      s.store.RealPath(dstPath),
+		FileType:      src.FileType,
+		MimeType:      src.MimeType,
+		Size:          size,
+		SHA256:        hex.EncodeToString(h.Sum(nil)),
+		IsE2EE:        src.IsE2EE,
+		DEKCiphertext: src.DEKCiphertext,
+		KEKVersion:    src.KEKVersion,
 	}
 
 	if err := s.fileRepo.Create(f); err != nil {

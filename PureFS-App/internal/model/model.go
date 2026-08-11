@@ -26,6 +26,7 @@ type File struct {
 	IsEncrypted   bool      `json:"is_encrypted" db:"is_encrypted"`
 	DEKCiphertext string    `json:"dek_ciphertext" db:"dek_ciphertext"`
 	KEKVersion    int64     `json:"kek_version" db:"kek_version"`
+	IsE2EE        bool      `json:"is_e2ee" db:"is_e2ee"`
 	CreatedAt     time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
 }
@@ -42,11 +43,13 @@ type User struct {
 	StorageUsed   int64     `json:"storage_used" db:"storage_used"`
 	RootDir       string    `json:"root_dir" db:"root_dir"`
 	IsActive      bool      `json:"is_active" db:"is_active"`
-	SSHPublicKey  string    `json:"-" db:"ssh_public_key"`
-	ResetToken    string    `json:"-" db:"reset_token"`
+	SSHPublicKey      string    `json:"-" db:"ssh_public_key"`
+	ResetToken        string    `json:"-" db:"reset_token"`
 	ResetTokenExpires *time.Time `json:"-" db:"reset_token_expires"`
-	CreatedAt     time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
+	E2EESalt          string    `json:"-" db:"e2ee_salt"`
+	E2EEWrappedKey    string    `json:"-" db:"e2ee_wrapped_key"`
+	CreatedAt         time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type Share struct {

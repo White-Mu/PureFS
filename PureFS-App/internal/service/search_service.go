@@ -109,6 +109,11 @@ func (s *SearchService) indexFile(fileID, userID int64) error {
 		return fmt.Errorf("get file: %w", err)
 	}
 
+	// E2EE files are stored as ciphertext; skip content indexing entirely.
+	if f.IsE2EE {
+		return nil
+	}
+
 	reader, err := s.store.Open(f.Path)
 	if err != nil {
 		return fmt.Errorf("open file for indexing: %w", err)
@@ -177,7 +182,7 @@ func (s *SearchService) RebuildIndex(ctx context.Context) error {
 		}
 
 		for _, f := range files {
-			if f.FileType == model.FileTypeDir {
+			if f.FileType == model.FileTypeDir || f.IsE2EE {
 				continue
 			}
 			if err := s.indexFile(f.ID, f.UserID); err != nil {

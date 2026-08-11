@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { FileItem } from '../api';
 import { files } from '../api';
+import { useE2EEStore } from '../store/e2ee';
+import { decryptFile } from '../utils/e2ee';
 
 interface Props {
   file: FileItem;
@@ -9,22 +11,51 @@ interface Props {
 
 export default function FilePreview({ file, onClose }: Props) {
   const [textContent, setTextContent] = useState<string | null>(null);
+  const [decryptedUrl, setDecryptedUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const e2eeMasterKey = useE2EEStore((s) => s.masterKey);
 
   const isImage = file.mime_type?.startsWith('image/');
   const isVideo = file.mime_type?.startsWith('video/');
   const isText = file.mime_type?.startsWith('text/') || file.mime_type === 'application/json';
 
+  const isEncrypted = !!file.is_e2ee;
+
   useEffect(() => {
+    const previewUrl = `${import.meta.env.VITE_API_BASE || ''}/api/files/${file.id}/preview?token=${localStorage.getItem('token')}`;
+
+    // E2EE files are ciphertext on the server. Decrypt locally for preview.
+    if (isEncrypted) {
+      if (!e2eeMasterKey || !file.dek_ciphertext) {
+        setError('This file is encrypted. Unlock your master key in Settings first.');
+        setLoading(false);
+        return;
+      }
+      files.downloadBlob(file.id)
+        .then((blob) => blob.arrayBuffer())
+        .then((buf) => decryptFile(buf, file.dek_ciphertext!, e2eeMasterKey!))
+        .then((plaintext) => {
+          const blob = new Blob([plaintext], { type: file.mime_type || 'application/octet-stream' });
+          if (isText) {
+            return blob.text().then((t) => { setTextContent(t); });
+          }
+          setDecryptedUrl(URL.createObjectURL(blob));
+        })
+        .catch(() => setError('Failed to decrypt this file.'))
+        .finally(() => setLoading(false));
+      return;
+    }
+
     if (isText) {
-      fetch(files.downloadBlobUrl(file.id))
+      fetch(previewUrl)
         .then(r => r.text())
         .then(setTextContent)
         .finally(() => setLoading(false));
     } else {
       setLoading(false);
     }
-  }, [file.id]);
+  }, [file.id, isEncrypted, isText]);
 
   const previewUrl = `${import.meta.env.VITE_API_BASE || ''}/api/files/${file.id}/preview?token=${localStorage.getItem('token')}`;
 
@@ -51,13 +82,18 @@ export default function FilePreview({ file, onClose }: Props) {
         </div>
 
         {/* Content */}
-        {isImage ? (
-          <img src={previewUrl} alt={file.name} style={{
+        {error ? (
+          <div style={{
+            background: 'rgba(255,0,0,0.15)', border: '1px solid rgba(255,0,0,0.4)',
+            color: '#fff', padding: '16px 24px', borderRadius: 8, fontSize: 14,
+          }}>{error}</div>
+        ) : isImage ? (
+          <img src={isEncrypted ? decryptedUrl || undefined : previewUrl} alt={file.name} style={{
             maxWidth: '90vw', maxHeight: '80vh', objectFit: 'contain',
             borderRadius: 8, boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
           }} />
         ) : isVideo ? (
-          <video src={previewUrl} controls style={{
+          <video src={isEncrypted ? decryptedUrl || undefined : previewUrl} controls style={{
             maxWidth: '90vw', maxHeight: '80vh', borderRadius: 8,
             boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
           }} />

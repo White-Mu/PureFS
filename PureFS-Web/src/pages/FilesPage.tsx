@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useUIStore } from '../store';
+import { useE2EEStore } from '../store/e2ee';
 import { files } from '../api';
 import type { FileItem, FileListResponse } from '../api';
 import FileRow from '../components/FileRow';
@@ -10,6 +11,7 @@ import UploadOverlay from '../components/UploadOverlay';
 import ContextMenu from '../components/ContextMenu';
 import ShareDialog from '../components/ShareDialog';
 import FilePreview from '../components/FilePreview';
+import { encryptFile, decryptFile } from '../utils/e2ee';
 
 interface BreadcrumbItem {
   id: number | null;
@@ -19,6 +21,8 @@ interface BreadcrumbItem {
 export default function FilesPage({ viewFilter }: { viewFilter?: string }) {
   const viewMode = useUIStore((s) => s.viewMode);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const e2eeEnabled = useE2EEStore((s) => s.enabled);
+  const e2eeMasterKey = useE2EEStore((s) => s.masterKey);
 
   const [data, setData] = useState<FileListResponse>({ items: [], total: 0 });
   const [loading, setLoading] = useState(true);
@@ -143,7 +147,15 @@ export default function FilesPage({ viewFilter }: { viewFilter?: string }) {
       newUploads.push(item);
       setUploads([...newUploads]);
       try {
-        await files.upload(file, currentParentId ?? undefined);
+        // If E2EE is enabled and the master key is unlocked, encrypt the file
+        // in the browser before upload. The server only stores ciphertext.
+        if (e2eeEnabled && e2eeMasterKey) {
+          const data = await file.arrayBuffer();
+          const { ciphertext, wrappedDEK } = await encryptFile(data, e2eeMasterKey);
+          await files.uploadE2EE(ciphertext, file.name, currentParentId ?? undefined, wrappedDEK);
+        } else {
+          await files.upload(file, currentParentId ?? undefined);
+        }
         item.progress = 100;
         item.done = true;
       } catch {
@@ -195,6 +207,25 @@ export default function FilesPage({ viewFilter }: { viewFilter?: string }) {
   const handleDownload = async (file: FileItem) => {
     if (file.file_type === 'directory') return;
     try {
+      // E2EE files are ciphertext on the server; decrypt in the browser first.
+      if (file.is_e2ee) {
+        if (!e2eeMasterKey || !file.dek_ciphertext) {
+          alert('This file is encrypted. Unlock your master key in Settings first.');
+          return;
+        }
+        const blob = await files.downloadBlob(file.id);
+        const plaintext = await decryptFile(await blob.arrayBuffer(), file.dek_ciphertext, e2eeMasterKey);
+        const url = URL.createObjectURL(new Blob([plaintext]));
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        return;
+      }
+
       const blob = await files.downloadBlob(file.id);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');

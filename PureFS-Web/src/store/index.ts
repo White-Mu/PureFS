@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { auth } from '../api';
 import type { User } from '../api';
+import { useE2EEStore } from './e2ee';
 
 interface AuthState {
   user: User | null;
@@ -24,12 +25,16 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.setItem('token', res.token);
     localStorage.setItem('user', JSON.stringify(res.user));
     set({ token: res.token, user: res.user });
+    // Refresh E2EE status for the newly-logged-in user.
+    useE2EEStore.getState().loadStatus();
   },
 
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     set({ token: null, user: null });
+    // Forget the in-memory E2EE master key.
+    useE2EEStore.getState().lock();
   },
 
   loadUser: async () => {
@@ -37,6 +42,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const user = await auth.me();
       localStorage.setItem('user', JSON.stringify(user));
       set({ user });
+      useE2EEStore.getState().loadStatus();
     } catch {
       set({ user: null, token: null });
     }

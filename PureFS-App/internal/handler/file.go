@@ -127,7 +127,20 @@ func (h *FileHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		name = nameOverride
 	}
 
-	f, err := h.svc.Upload(userID, parentID, name, file)
+	// E2EE upload: the file bytes are already client-encrypted ciphertext.
+	// The client supplies the wrapped DEK and marks the upload with is_e2ee.
+	opts := service.UploadOptions{}
+	if r.FormValue("is_e2ee") == "true" {
+		opts.IsE2EE = true
+		opts.DEKCiphertext = r.FormValue("dek_ciphertext")
+		if kvStr := r.FormValue("kek_version"); kvStr != "" {
+			if v, err := strconv.ParseInt(kvStr, 10, 64); err == nil {
+				opts.KEKVersion = v
+			}
+		}
+	}
+
+	f, err := h.svc.UploadWithOptions(userID, parentID, name, file, opts)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

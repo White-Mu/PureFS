@@ -12,6 +12,10 @@ export interface FileItem {
   sha256: string;
   is_pinned: boolean;
   is_favorite: boolean;
+  is_e2ee?: boolean;
+  is_encrypted?: boolean;
+  dek_ciphertext?: string;
+  kek_version?: number;
   created_at: string;
   updated_at: string;
 }
@@ -60,6 +64,12 @@ export interface Share {
   created_at: string;
 }
 
+export interface E2EEStatus {
+  enabled: boolean;
+  salt?: string;
+  wrapped_key?: string;
+}
+
 export const auth = {
   login: (data: { username: string; password: string; totp_code?: string }) =>
     api.post<LoginResponse>('/auth/login', data).then(r => r.data),
@@ -76,6 +86,13 @@ export const auth = {
   enableTOTP: (code: string) => api.post('/auth/totp/enable', { code }),
 
   disableTOTP: () => api.post('/auth/totp/disable'),
+
+  e2eeStatus: () => api.get<E2EEStatus>('/users/e2ee/status').then(r => r.data),
+
+  e2eeSetup: (data: { salt: string; wrapped_key: string }) =>
+    api.post('/users/e2ee', data),
+
+  e2eeDisable: () => api.delete('/users/e2ee'),
 };
 
 export const files = {
@@ -103,6 +120,18 @@ export const files = {
     const form = new FormData();
     form.append('file', file);
     if (parentId) form.append('parent_id', String(parentId));
+    return api.post<FileItem>('/files/upload', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(r => r.data);
+  },
+
+  uploadE2EE: (file: Blob, name: string, parentId: number | undefined, dekCiphertext: string) => {
+    const form = new FormData();
+    form.append('file', file, name);
+    if (parentId) form.append('parent_id', String(parentId));
+    form.append('is_e2ee', 'true');
+    form.append('dek_ciphertext', dekCiphertext);
+    form.append('kek_version', '0');
     return api.post<FileItem>('/files/upload', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }).then(r => r.data);

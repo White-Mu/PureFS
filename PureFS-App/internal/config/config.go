@@ -19,15 +19,26 @@ type Config struct {
 	Search     SearchConfig     `yaml:"search"`
 	SFTP       SFTPConfig       `yaml:"sftp"`
 	Versioning VersionConfig    `yaml:"versioning"`
+	TLS        TLSConfig        `yaml:"tls"`
 }
 
 type ServerConfig struct {
-	Host         string        `yaml:"host"`
-	Port         int           `yaml:"port"`
-	ExternalURL  string        `yaml:"external_url"`
-	ReadTimeout  time.Duration `yaml:"read_timeout"`
-	WriteTimeout time.Duration `yaml:"write_timeout"`
-	UploadMaxSize int64        `yaml:"upload_max_size"`
+	Host          string        `yaml:"host"`
+	Port          int           `yaml:"port"`
+	ExternalURL   string        `yaml:"external_url"`
+	ReadTimeout   time.Duration `yaml:"read_timeout"`
+	WriteTimeout  time.Duration `yaml:"write_timeout"`
+	UploadMaxSize int64         `yaml:"upload_max_size"`
+}
+
+// TLSConfig controls HTTPS serving. When Enabled is true and Cert/Key point to
+// valid files, the server serves HTTPS. When Auto is true, a self-signed
+// certificate is generated automatically on first start.
+type TLSConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	Cert    string `yaml:"cert"`
+	Key     string `yaml:"key"`
+	Auto    bool   `yaml:"auto"`
 }
 
 type DatabaseConfig struct {
@@ -164,6 +175,12 @@ func Default() *Config {
 		},
 		Versioning: VersionConfig{
 			MaxVersions: 10,
+		},
+		TLS: TLSConfig{
+			Enabled: false,
+			Cert:    "data/tls/cert.pem",
+			Key:     "data/tls/key.pem",
+			Auto:    true,
 		},
 	}
 }

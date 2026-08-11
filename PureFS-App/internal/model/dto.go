@@ -12,8 +12,28 @@ type FileInfo struct {
 	SHA256     string    `json:"sha256,omitempty"`
 	IsPinned   bool      `json:"is_pinned"`
 	IsFavorite bool      `json:"is_favorite"`
+	IsE2EE     bool      `json:"is_e2ee"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+// E2EESetupRequest carries the client's encrypted master key and salt when the
+// user enables End-to-End encryption. wrapped_key is the client-generated
+// 32-byte master key encrypted with a key derived from the user's passphrase.
+type E2EESetupRequest struct {
+	Salt        string `json:"salt"`
+	WrappedKey  string `json:"wrapped_key"`
+	Check       string `json:"check"`
+}
+
+// E2EEStatusResponse reports whether the account has E2EE enabled and the
+// client-side material needed to re-derive the master key from the passphrase.
+// Both are stored server-side but are not secret: wrapped_key is only
+// decryptable with the passphrase-derived key.
+type E2EEStatusResponse struct {
+	Enabled    bool   `json:"enabled"`
+	Salt       string `json:"salt,omitempty"`
+	WrappedKey string `json:"wrapped_key,omitempty"`
 }
 
 type FileListQuery struct {

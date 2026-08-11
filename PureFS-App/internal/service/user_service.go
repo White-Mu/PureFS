@@ -223,6 +223,53 @@ func (s *UserService) ToggleUserActive(userID int64, active bool) error {
 	return s.userRepo.Update(u)
 }
 
+// SetE2EE stores the client-generated E2EE salt and wrapped master key. The
+// server never sees the master key; it only holds the version encrypted by a
+// key derived from the user's passphrase.
+func (s *UserService) SetE2EE(userID int64, req model.E2EESetupRequest) error {
+	if req.Salt == "" || req.WrappedKey == "" {
+		return fmt.Errorf("salt and wrapped key are required")
+	}
+	u, err := s.userRepo.GetByID(userID)
+	if err != nil {
+		return fmt.Errorf("user not found: %w", err)
+	}
+	if err := s.userRepo.SetE2EEKeys(u.ID, req.Salt, req.WrappedKey); err != nil {
+		return fmt.Errorf("set e2ee keys: %w", err)
+	}
+	s.logAudit(userID, "e2ee_setup", "end-to-end encryption enabled")
+	return nil
+}
+
+// GetE2EEStatus returns whether the account has E2EE enabled and, if so, the
+// salt and wrapped master key the client needs to unlock the master key from
+// the passphrase.
+func (s *UserService) GetE2EEStatus(userID int64) (model.E2EEStatusResponse, error) {
+	u, err := s.userRepo.GetByID(userID)
+	if err != nil {
+		return model.E2EEStatusResponse{}, fmt.Errorf("user not found: %w", err)
+	}
+	return model.E2EEStatusResponse{
+		Enabled:    u.E2EESalt != "",
+		Salt:       u.E2EESalt,
+		WrappedKey: u.E2EEWrappedKey,
+	}, nil
+}
+
+// DisableE2EE clears the stored E2EE keys. Existing E2EE-encrypted files
+// become permanently undecryptable; new uploads will be plaintext again.
+func (s *UserService) DisableE2EE(userID int64) error {
+	u, err := s.userRepo.GetByID(userID)
+	if err != nil {
+		return fmt.Errorf("user not found: %w", err)
+	}
+	if err := s.userRepo.ClearE2EE(u.ID); err != nil {
+		return fmt.Errorf("clear e2ee keys: %w", err)
+	}
+	s.logAudit(userID, "e2ee_disable", "end-to-end encryption disabled")
+	return nil
+}
+
 // ForgotPassword generates a reset token for the user and returns it.
 // In production, the token should be emailed; for self-hosted use, the
 // token is returned in the response so the admin can relay it.

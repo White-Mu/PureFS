@@ -144,6 +144,43 @@ func (h *UserHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
+// GetE2EEStatus returns whether the account has E2EE enabled and the salt
+// needed to re-derive the master key from the passphrase.
+func (h *UserHandler) GetE2EEStatus(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r.Context())
+	status, err := h.svc.GetE2EEStatus(userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, status)
+}
+
+// SetE2EE stores the client-generated E2EE salt and wrapped master key.
+func (h *UserHandler) SetE2EE(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r.Context())
+	var req model.E2EESetupRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := h.svc.SetE2EE(userID, req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// DisableE2EE clears the stored E2EE keys.
+func (h *UserHandler) DisableE2EE(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r.Context())
+	if err := h.svc.DisableE2EE(userID); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 // AdminCreateUser handles admin-only user creation.
 func (h *UserHandler) AdminCreateUser(w http.ResponseWriter, r *http.Request) {
 	if middleware.GetUserRole(r.Context()) != "admin" {

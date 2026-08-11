@@ -21,6 +21,7 @@ import (
 	"github.com/purefs/purefs/internal/search"
 	"github.com/purefs/purefs/internal/service"
 	"github.com/purefs/purefs/internal/storage"
+	"github.com/purefs/purefs/internal/tlsutil"
 	"github.com/purefs/purefs/pkg/sftp"
 	"github.com/purefs/purefs/webdav"
 )
@@ -172,6 +173,11 @@ func main() {
 			r.Post("/api/auth/totp/disable", authHandler.DisableTOTP)
 		r.Post("/api/auth/refresh", authHandler.Refresh)
 
+		// E2EE routes (authenticated)
+		r.Get("/api/users/e2ee/status", authHandler.GetE2EEStatus)
+		r.Post("/api/users/e2ee", authHandler.SetE2EE)
+		r.Delete("/api/users/e2ee", authHandler.DisableE2EE)
+
 		fileHandler := handler.NewFileHandler(fileSvc)
 		fileHandler.RegisterRoutes(r)
 
@@ -255,11 +261,23 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Server error: %v", err)
+	if cfg.TLS.Enabled {
+		if err := tlsutil.EnsureCert(cfg.TLS.Cert, cfg.TLS.Key, cfg.TLS.Auto, []string{"localhost"}); err != nil {
+			log.Fatalf("TLS setup: %v", err)
 		}
-	}()
+		fmt.Printf("HTTPS enabled - listening on https://localhost:%d\n", cfg.Server.Port)
+		go func() {
+			if err := server.ListenAndServeTLS(cfg.TLS.Cert, cfg.TLS.Key); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("HTTPS server error: %v", err)
+			}
+		}()
+	} else {
+		go func() {
+			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("Server error: %v", err)
+			}
+		}()
+	}
 
 	// Start periodic integrity check if enabled
 	if cfg.Integrity.Enabled {
