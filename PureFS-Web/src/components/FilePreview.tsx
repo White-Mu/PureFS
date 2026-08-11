@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { FileItem } from '../api';
 import { files } from '../api';
 import { useE2EEStore } from '../store/e2ee';
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export default function FilePreview({ file, onClose }: Props) {
+  const { t } = useTranslation();
   const [textContent, setTextContent] = useState<string | null>(null);
   const [decryptedUrl, setDecryptedUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,7 +30,7 @@ export default function FilePreview({ file, onClose }: Props) {
     // E2EE files are ciphertext on the server. Decrypt locally for preview.
     if (isEncrypted) {
       if (!e2eeMasterKey || !file.dek_ciphertext) {
-        setError('This file is encrypted. Unlock your master key in Settings first.');
+        setError(t('e2ee.fileLocked'));
         setLoading(false);
         return;
       }
@@ -38,11 +40,11 @@ export default function FilePreview({ file, onClose }: Props) {
         .then((plaintext) => {
           const blob = new Blob([plaintext], { type: file.mime_type || 'application/octet-stream' });
           if (isText) {
-            return blob.text().then((t) => { setTextContent(t); });
+            return blob.text().then((text) => { setTextContent(text); });
           }
           setDecryptedUrl(URL.createObjectURL(blob));
         })
-        .catch(() => setError('Failed to decrypt this file.'))
+        .catch(() => setError(t('e2ee.decryptFailed')))
         .finally(() => setLoading(false));
       return;
     }
@@ -55,7 +57,7 @@ export default function FilePreview({ file, onClose }: Props) {
     } else {
       setLoading(false);
     }
-  }, [file.id, isEncrypted, isText]);
+  }, [file.id, isEncrypted, isText, t]);
 
   const previewUrl = `${import.meta.env.VITE_API_BASE || ''}/api/files/${file.id}/preview?token=${localStorage.getItem('token')}`;
 

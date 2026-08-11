@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../store';
 import { useE2EEStore } from '../store/e2ee';
 import { files } from '../api';
@@ -19,6 +20,7 @@ interface BreadcrumbItem {
 }
 
 export default function FilesPage({ viewFilter }: { viewFilter?: string }) {
+  const { t } = useTranslation();
   const viewMode = useUIStore((s) => s.viewMode);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const e2eeEnabled = useE2EEStore((s) => s.enabled);
@@ -210,7 +212,7 @@ export default function FilesPage({ viewFilter }: { viewFilter?: string }) {
       // E2EE files are ciphertext on the server; decrypt in the browser first.
       if (file.is_e2ee) {
         if (!e2eeMasterKey || !file.dek_ciphertext) {
-          alert('This file is encrypted. Unlock your master key in Settings first.');
+          alert(t('e2ee.fileLocked'));
           return;
         }
         const blob = await files.downloadBlob(file.id);

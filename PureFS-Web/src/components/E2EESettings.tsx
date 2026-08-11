@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { auth } from '../api';
 import {
   generateMasterKey, generateSalt, deriveKEK, wrapMasterKey,
@@ -17,6 +18,7 @@ import { useE2EEStore } from '../store/e2ee';
 // Unlock flow (for existing users): enter the passphrase to unwrap the master
 // key into memory. It is never persisted to localStorage or sent to the server.
 export default function E2EESettings() {
+  const { t } = useTranslation();
   const enabled = useE2EEStore((s) => s.enabled);
   const unlock = useE2EEStore((s) => s.unlock);
   const lock = useE2EEStore((s) => s.lock);
@@ -42,11 +44,11 @@ export default function E2EESettings() {
     setError('');
     setInfo('');
     if (passphrase.length < 8) {
-      setError('Passphrase must be at least 8 characters.');
+      setError(t('e2ee.passphraseShort'));
       return;
     }
     if (passphrase !== confirm) {
-      setError('Passphrases do not match.');
+      setError(t('e2ee.passphraseMismatch'));
       return;
     }
     setBusy(true);
@@ -59,9 +61,9 @@ export default function E2EESettings() {
       await auth.e2eeSetup({ salt, wrapped_key: wrappedKey });
       setEnabled(true);
       setBackupKey(wrappedKey);
-      setInfo('End-to-end encryption is now enabled.');
+      setInfo(t('e2ee.enabledSuccess'));
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to enable encryption.');
+      setError(err.response?.data?.error || t('e2ee.setupFailed'));
     } finally {
       setBusy(false);
     }
@@ -71,16 +73,16 @@ export default function E2EESettings() {
     setError('');
     setInfo('');
     if (!passphrase) {
-      setError('Enter your passphrase.');
+      setError(t('e2ee.passphrase'));
       return;
     }
     setBusy(true);
     try {
       const ok = await unlock(passphrase);
       if (!ok) {
-        setError('Incorrect passphrase. The master key could not be unlocked.');
+        setError(t('e2ee.unlockWrong'));
       } else {
-        setInfo('Master key unlocked for this session.');
+        setInfo(t('e2ee.unlockSuccess'));
         setMode('idle');
         setPassphrase('');
       }
@@ -90,9 +92,7 @@ export default function E2EESettings() {
   };
 
   const handleDisable = async () => {
-    if (!window.confirm(
-      'Disabling End-to-End encryption will make existing encrypted files permanently undecryptable. Are you sure?',
-    )) return;
+    if (!window.confirm(t('e2ee.disableConfirm'))) return;
     setBusy(true);
     setError('');
     try {
@@ -101,9 +101,9 @@ export default function E2EESettings() {
       setEnabled(false);
       setBackupKey(null);
       resetForm();
-      setInfo('End-to-End encryption disabled. Existing encrypted files cannot be decrypted anymore.');
+      setInfo(t('e2ee.disabledNotice'));
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to disable encryption.');
+      setError(err.response?.data?.error || t('e2ee.disableFailed'));
     } finally {
       setBusy(false);
     }
@@ -114,7 +114,7 @@ export default function E2EESettings() {
       background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
       borderRadius: 'var(--radius-md)', padding: 24, marginBottom: 16,
     }}>
-      <h3 style={{ marginBottom: 16 }}>🔐 End-to-End Encryption</h3>
+      <h3 style={{ marginBottom: 16 }}>🔐 {t('e2ee.title')}</h3>
 
       {error && (
         <div className="toast toast-error" style={{ marginBottom: 16 }}>{error}</div>
@@ -129,13 +129,13 @@ export default function E2EESettings() {
       {enabled ? (
         <div>
           <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 12 }}>
-            End-to-end encryption is <strong style={{ color: 'var(--success)' }}>enabled</strong>.
-            Files are encrypted in your browser before upload; the server only stores ciphertext.
+            {t('e2ee.title')} <strong style={{ color: 'var(--success)' }}>{t('e2ee.enabled')}</strong>.
+            {t('e2ee.enabledDesc')}
           </p>
           {backupKey && (
             <div style={{ marginBottom: 16 }}>
               <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>
-                ⚠️ Save this backup key somewhere safe. It can unlock your files even if you forget your passphrase.
+                ⚠️ {t('e2ee.backupKeyWarning')}
               </p>
               <code style={{
                 padding: '8px 12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)',
@@ -144,75 +144,73 @@ export default function E2EESettings() {
             </div>
           )}
           <button className="btn btn-danger" onClick={handleDisable} disabled={busy}>
-            {busy ? 'Disabling...' : 'Disable E2EE'}
+            {busy ? t('e2ee.disabling') : t('e2ee.disable')}
           </button>
         </div>
       ) : mode === 'idle' ? (
         <div>
           <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 12 }}>
-            Encrypt files in your browser before they leave your device. The server never sees
-            your content or your key. Forgetting your passphrase makes data unrecoverable —
-            keep a backup key.
+            {t('e2ee.setupIntro')}
           </p>
-          <button className="btn btn-primary" onClick={() => setMode('setup')}>Set up E2EE</button>
+          <button className="btn btn-primary" onClick={() => setMode('setup')}>{t('e2ee.setup')}</button>
           <button
             className="btn"
             style={{ marginLeft: 8 }}
             onClick={() => { setMode('unlock'); setError(''); setInfo(''); }}
           >
-            Unlock master key
+            {t('e2ee.unlockMasterKey')}
           </button>
         </div>
       ) : mode === 'setup' ? (
         <div>
           <p style={{ fontSize: 14, marginBottom: 12 }}>
-            Choose a passphrase to protect your master key. This passphrase is never sent to the server.
+            {t('e2ee.setupPrompt')}
           </p>
           <div className="form-group">
-            <label>Passphrase</label>
+            <label>{t('e2ee.passphrase')}</label>
             <input
               type="password" value={passphrase}
               onChange={(e) => setPassphrase(e.target.value)}
-              placeholder="At least 8 characters"
+              placeholder={t('e2ee.passphrasePlaceholder')}
               style={{ width: '100%', maxWidth: 360 }}
             />
           </div>
           <div className="form-group">
-            <label>Confirm passphrase</label>
+            <label>{t('e2ee.confirmPassphrase')}</label>
             <input
               type="password" value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
-              placeholder="Repeat passphrase"
+              placeholder={t('e2ee.confirmPlaceholder')}
               style={{ width: '100%', maxWidth: 360 }}
             />
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-primary" onClick={handleSetup} disabled={busy}>
-              {busy ? 'Encrypting...' : 'Enable E2EE'}
+              {busy ? t('e2ee.encrypting') : t('e2ee.enable')}
             </button>
-            <button className="btn" onClick={resetForm} disabled={busy}>Cancel</button>
+            <button className="btn" onClick={resetForm} disabled={busy}>{t('e2ee.cancel')}</button>
           </div>
         </div>
       ) : (
         <div>
           <p style={{ fontSize: 14, marginBottom: 12 }}>
-            Enter your passphrase to unlock the master key for this session.
+            {t('e2ee.unlockPrompt')}
           </p>
           <div className="form-group">
-            <label>Passphrase</label>
+            <label>{t('e2ee.passphrase')}</label>
             <input
               type="password" value={passphrase}
               onChange={(e) => setPassphrase(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleUnlock(); }}
-              placeholder="Your E2EE passphrase"
+              placeholder={t('e2ee.passphrase')}
               style={{ width: '100%', maxWidth: 360 }}
             />
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-primary" onClick={handleUnlock} disabled={busy}>
-              {busy ? 'Unlocking...' : 'Unlock'}
+              {busy ? t('e2ee.unlocking') : t('e2ee.unlock')}
             </button>
-            <button className="btn" onClick={resetForm} disabled={busy}>Cancel</button>
+            <button className="btn" onClick={resetForm} disabled={busy}>{t('e2ee.cancel')}</button>
           </div>
         </div>
       )}
