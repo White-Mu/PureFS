@@ -75,6 +75,7 @@ type FileService struct {
 	userRepo    *repository.UserRepo
 	recycleSvc  *RecycleService
 	versionSvc  *VersionService
+	auditSvc    *AuditService
 	store       storage.Storage
 	cfg         *config.Config
 	searchSvc   *SearchService
@@ -82,6 +83,19 @@ type FileService struct {
 
 func NewFileService(fileRepo *repository.FileRepo, permRepo *repository.PermissionRepo, userRepo *repository.UserRepo, recycleSvc *RecycleService, store storage.Storage, cfg *config.Config) *FileService {
 	return &FileService{fileRepo: fileRepo, permRepo: permRepo, userRepo: userRepo, recycleSvc: recycleSvc, store: store, cfg: cfg}
+}
+
+// SetAuditService sets the audit logging service.
+func (s *FileService) SetAuditService(auditSvc *AuditService) {
+	s.auditSvc = auditSvc
+}
+
+// logAudit records an audit log entry (best-effort, never fails the operation).
+func (s *FileService) logAudit(userID int64, action, detail string) {
+	if s.auditSvc == nil {
+		return
+	}
+	_ = s.auditSvc.Log(userID, action, detail, "")
 }
 
 // SetSearchService sets the search service for async indexing after upload/delete.
@@ -125,6 +139,7 @@ func (s *FileService) CreateDir(userID int64, parentID *int64, name string) (*mo
 		return nil, fmt.Errorf("create directory record: %w", err)
 	}
 
+	s.logAudit(userID, "create_dir", f.Path)
 	return f, nil
 }
 
@@ -216,6 +231,7 @@ func (s *FileService) Upload(userID int64, parentID *int64, name string, reader 
 		s.searchSvc.IndexFileAsync(f.ID, userID)
 	}
 
+	s.logAudit(userID, "upload", f.Path)
 	return f, nil
 }
 
@@ -268,6 +284,7 @@ func (s *FileService) Rename(userID int64, fileID int64, newName string) (*model
 		return nil, fmt.Errorf("rename record: %w", err)
 	}
 
+	s.logAudit(userID, "rename", oldPath+" -> "+newPath)
 	return f, nil
 }
 
@@ -329,6 +346,7 @@ func (s *FileService) Delete(userID int64, fileID int64) error {
 		}
 	}
 
+	s.logAudit(userID, "delete", f.Path)
 	return nil
 }
 
@@ -470,6 +488,7 @@ func (s *FileService) Copy(userID int64, fileID int64, targetParentID *int64, ne
 		}
 	}
 
+	s.logAudit(userID, "copy", src.Path+" -> "+dstPath)
 	return f, nil
 }
 

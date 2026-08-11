@@ -16,10 +16,23 @@ import (
 type UserService struct {
 	userRepo *repository.UserRepo
 	cfg      *config.Config
+	auditSvc *AuditService
 }
 
 func NewUserService(userRepo *repository.UserRepo, cfg *config.Config) *UserService {
 	return &UserService{userRepo: userRepo, cfg: cfg}
+}
+
+// SetAuditService sets the audit logging service.
+func (s *UserService) SetAuditService(auditSvc *AuditService) {
+	s.auditSvc = auditSvc
+}
+
+func (s *UserService) logAudit(userID int64, action, detail string) {
+	if s.auditSvc == nil {
+		return
+	}
+	_ = s.auditSvc.Log(userID, action, detail, "")
 }
 
 func (s *UserService) Register(req model.RegisterUserRequest) (*model.User, error) {
@@ -48,6 +61,7 @@ func (s *UserService) Register(req model.RegisterUserRequest) (*model.User, erro
 		return nil, fmt.Errorf("create user: %w", err)
 	}
 
+	s.logAudit(u.ID, "register", "user registered: "+req.Username)
 	return u, nil
 }
 
@@ -79,6 +93,7 @@ func (s *UserService) Login(req model.LoginRequest) (*model.LoginResponse, error
 		return nil, fmt.Errorf("generate token: %w", err)
 	}
 
+	s.logAudit(u.ID, "login", "user logged in")
 	return &model.LoginResponse{
 		Token: token,
 		User:  *u,

@@ -106,6 +106,10 @@ func main() {
 	auditSvc := service.NewAuditService(auditRepo)
 	integritySvc := service.NewIntegrityService(store, cfg)
 
+	// Wire audit logging into services
+	userSvc.SetAuditService(auditSvc)
+	fileSvc.SetAuditService(auditSvc)
+
 	// Initialize full-text search
 	var searchSvc *service.SearchService
 	if cfg.Search.Enabled {
